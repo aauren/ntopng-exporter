@@ -1,0 +1,4 @@
+ntopng:
+  endpoint: 127.0.0.1:3000
+  user: admin
+  password: admin
