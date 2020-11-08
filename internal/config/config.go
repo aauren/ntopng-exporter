@@ -12,17 +12,17 @@ type ntopng struct {
 	AuthMethod string
 }
 
-type config struct {
+type Config struct {
 	Ntopng ntopng
 }
 
-func ParseConfig() (config, error) {
-	var config config
+func ParseConfig() (Config, error) {
+	var config Config
 	viper.SetConfigName("ntopng-exporter")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("$HOME/.ntopng-exporter")
 	viper.AddConfigPath("/etc/ntopng-exporter/")
-	viper.AddConfigPath("./config")
+	viper.AddConfigPath("./Config")
 
 	err := viper.ReadInConfig()
 	if err != nil {
@@ -33,18 +33,18 @@ func ParseConfig() (config, error) {
 	if err != nil {
 		return config, err
 	}
-	//err = config.validate()
+	//err = Config.validate()
 	return config, err
 }
 
-func (c *config) validate() error {
-	if c.Ntopng.AuthMethod != "cookie" && c.Ntopng.AuthMethod != "basic" {
-		return fmt.Errorf("ntopng authMethod must be either cookie or basic")
+func (c *Config) validate() error {
+	if c.Ntopng.AuthMethod != "cookie" && c.Ntopng.AuthMethod != "basic" && c.Ntopng.AuthMethod != "none" {
+		return fmt.Errorf("ntopng authMethod must be either cookie, basic, or none")
 	}
 	return nil
 }
 
-func (c config) String() string {
+func (c Config) String() string {
 	configOutput := fmt.Sprintf("ntopng:\n\t%s", c.Ntopng)
 	return configOutput
 }

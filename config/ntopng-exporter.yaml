@@ -1,5 +1,5 @@
 ntopng:
-  endpoint: 127.0.0.1:3000
+  endpoint: "http://127.0.0.1:3000"
   user: admin
   password: admin
-  authMethod: cookie # cookie or basic are accepted values
+  authMethod: cookie # cookie, basic, or none are accepted values
