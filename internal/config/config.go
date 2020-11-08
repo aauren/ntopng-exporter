@@ -9,6 +9,7 @@ type ntopng struct {
 	EndPoint string
 	User     string
 	Password string
+	AuthMethod string
 }
 
 type config struct {
@@ -29,7 +30,18 @@ func ParseConfig() (config, error) {
 	}
 
 	err = viper.Unmarshal(&config)
+	if err != nil {
+		return config, err
+	}
+	//err = config.validate()
 	return config, err
+}
+
+func (c *config) validate() error {
+	if c.Ntopng.AuthMethod != "cookie" && c.Ntopng.AuthMethod != "basic" {
+		return fmt.Errorf("ntopng authMethod must be either cookie or basic")
+	}
+	return nil
 }
 
 func (c config) String() string {
@@ -38,5 +50,5 @@ func (c config) String() string {
 }
 
 func (n ntopng) String() string {
-	return fmt.Sprintf("%s: %s - %s", n.EndPoint, n.User, n.Password)
+	return fmt.Sprintf("%s: '%s'/'%s' - %s", n.EndPoint, n.User, n.Password, n.AuthMethod)
 }
