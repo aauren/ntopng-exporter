@@ -12,8 +12,13 @@ type ntopng struct {
 	AuthMethod string
 }
 
+type host struct {
+	InterfacesToMonitor []string
+}
+
 type Config struct {
 	Ntopng ntopng
+	Host host
 }
 
 func ParseConfig() (Config, error) {
@@ -40,6 +45,14 @@ func ParseConfig() (Config, error) {
 func (c *Config) validate() error {
 	if c.Ntopng.AuthMethod != "cookie" && c.Ntopng.AuthMethod != "basic" && c.Ntopng.AuthMethod != "none" {
 		return fmt.Errorf("ntopng authMethod must be either cookie, basic, or none")
+	}
+	if c.Host.InterfacesToMonitor != nil || len(c.Host.InterfacesToMonitor) < 1 {
+		return fmt.Errorf("must specify at least one interface to monitor")
+	}
+	for _, ifName := range c.Host.InterfacesToMonitor {
+		if ifName == "" {
+			return fmt.Errorf("interface name cannot be null or blank")
+		}
 	}
 	return nil
 }

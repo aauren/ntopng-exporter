@@ -3,3 +3,7 @@ ntopng:
   user: admin
   password: admin
   authMethod: cookie # cookie, basic, or none are accepted values
+
+host:
+  interfacesToMonitor:
+  - enp2s0

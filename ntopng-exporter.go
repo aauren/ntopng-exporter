@@ -15,9 +15,14 @@ func main() {
 	}
 	fmt.Printf("Config: %s\n\n", config)
 	ntopControl := ntopng.CreateController(config)
-	err = ntopControl.ScrapeHostEndpoint(1)
+	err = ntopControl.CacheInterfaceIds()
 	if err != nil {
-		fmt.Printf("failed to scrape host endpoint: %v", err)
+		fmt.Printf("failed to cache interface ids: %v\n", err)
 		os.Exit(2)
+	}
+	err = ntopControl.ScrapeHostEndpointForAllInterfaces()
+	if err != nil {
+		fmt.Printf("failed to scrape host endpoint: %v\n", err)
+		os.Exit(3)
 	}
 }

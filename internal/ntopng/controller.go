@@ -2,9 +2,9 @@ package ntopng
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/aauren/ntopng-exporter/internal/config"
-	"io/ioutil"
 	"net/http"
 )
 
@@ -13,10 +13,23 @@ const (
 	hostCustomFields = `ip,bytes.sent,bytes.rcvd,active_flows.as_client,active_flows.as_server,dns,num_alerts,mac,
 total_flows.as_client,total_flows.as_server,vlan,total_alerts,name`
 	hostCustomPath = "/host/custom_data.lua"
+	interfaceCustomPath = "/ntopng/interfaces.lua"
 )
 
 type controller struct {
 	config config.Config
+	ifList map[string]int
+}
+
+type ntopInterfaces struct {
+	IfID int `json:"ifid"`
+	IfName string `json:"ifname"`
+}
+
+type ntopResponse struct {
+	RcStr string `json:"rc_str"`
+	Rc int
+	Rsp json.RawMessage
 }
 
 func CreateController(config config.Config) controller {
@@ -25,7 +38,56 @@ func CreateController(config config.Config) controller {
 	return controller
 }
 
-func (c *controller) ScrapeHostEndpoint(interfaceId int) error {
+func (c *controller) CacheInterfaceIds() error {
+	endpoint := fmt.Sprintf("%s%s%s", c.config.Ntopng.EndPoint, luaRestV1Get, interfaceCustomPath)
+	req, err := http.NewRequest("GET", endpoint, nil)
+	if err != nil {
+		return err
+	}
+	c.setCommonOptions(req, false)
+	
+	body, status, err := getHttpResponseBody(req)
+	if status != http.StatusOK {
+		return fmt.Errorf("request to interface endpoint was not successful. Status: '%d', Response: '%v'",
+			status, *body)
+	}
+
+	rawInterfaces, err := getRawJsonFromNtopResponse(body)
+	if err != nil {
+		return err
+	}
+	var ifList []ntopInterfaces
+	err = json.Unmarshal(rawInterfaces, &ifList)
+	if err != nil {
+		return fmt.Errorf("was not able to parse interface list from ntopng: %v", err)
+	}
+	if len(ifList) < 1 {
+		return fmt.Errorf("ntopng returned 0 interfaces: %v", *body)
+	}
+	c.ifList = make(map[string]int, len(ifList))
+	for _, myIf := range ifList {
+		c.ifList[myIf.IfName] = myIf.IfID
+	}
+
+	for _, configuredIf := range c.config.Host.InterfacesToMonitor {
+		if _, ok := c.ifList[configuredIf]; !ok {
+			return fmt.Errorf("could not find '%s' interface in list returned by ntopng: %v",
+				configuredIf, c.ifList)
+		}
+	}
+	return nil
+}
+
+func (c *controller) ScrapeHostEndpointForAllInterfaces() error {
+	for _, configuredIf := range c.config.Host.InterfacesToMonitor {
+		if err := c.scrapeHostEndpoint(c.ifList[configuredIf]); err != nil {
+			return fmt.Errorf("failed to scrape interface '%s' with error: %v", configuredIf, err)
+		}
+	}
+	return nil
+}
+
+func (c *controller) scrapeHostEndpoint(interfaceId int) error {
 	endpoint := fmt.Sprintf("%s%s%s", c.config.Ntopng.EndPoint, luaRestV1Get, hostCustomPath)
 	payload := []byte(fmt.Sprintf(`{"ifid": %d, "field_alias": "%s"}`, interfaceId, hostCustomFields))
 	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(payload))
@@ -34,17 +96,9 @@ func (c *controller) ScrapeHostEndpoint(interfaceId int) error {
 	}
 	c.setCommonOptions(req, true)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	fmt.Printf("response Status: %s\n", resp.Status)
-	body, _ := ioutil.ReadAll(resp.Body)
-	fmt.Printf("response Body: %s", string(body))
-	return nil
+	body, status, err := getHttpResponseBody(req)
+	fmt.Printf("Status - %d\n\nBody - %s", status, *body)
+	return err
 }
 
 func (c *controller) setCommonOptions(req *http.Request, isJsonRequest bool) {
