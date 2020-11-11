@@ -7,3 +7,7 @@ ntopng:
 host:
   interfacesToMonitor:
   - enp2s0
+
+metric:
+  localSubnetsOnly: # if this is defined, only include the local subnets defined here (greatly reduces number of metrics)
+  - "192.168.0.0/24"

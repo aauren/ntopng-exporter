@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"github.com/spf13/viper"
+	"net"
 )
 
 type ntopng struct {
@@ -16,9 +17,14 @@ type host struct {
 	InterfacesToMonitor []string
 }
 
+type metric struct {
+	LocalSubnetsOnly []string
+}
+
 type Config struct {
 	Ntopng ntopng
 	Host host
+	Metric metric
 }
 
 func ParseConfig() (Config, error) {
@@ -52,6 +58,13 @@ func (c *Config) validate() error {
 	for _, ifName := range c.Host.InterfacesToMonitor {
 		if ifName == "" {
 			return fmt.Errorf("interface name cannot be null or blank")
+		}
+	}
+	if c.Metric.LocalSubnetsOnly != nil && len(c.Metric.LocalSubnetsOnly) > 0 {
+		for _, subnet := range c.Metric.LocalSubnetsOnly {
+			if _, _, err := net.ParseCIDR(subnet); err != nil {
+				return fmt.Errorf("subnet specified: '%s', is not a valid subnet: %v", subnet, err)
+			}
 		}
 	}
 	return nil

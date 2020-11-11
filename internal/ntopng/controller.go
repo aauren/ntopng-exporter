@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/aauren/ntopng-exporter/internal/config"
+	"net"
 	"net/http"
 	"strconv"
 )
@@ -104,12 +105,32 @@ func (c *Controller) scrapeHostEndpoint(interfaceId int) error {
 	if c.HostList == nil {
 		c.HostList = make(map[string]ntopHost)
 	}
+	var parsedSubnets []*net.IPNet
+	if c.config.Metric.LocalSubnetsOnly != nil && len(c.config.Metric.LocalSubnetsOnly) > 0 {
+		for _, subnet := range c.config.Metric.LocalSubnetsOnly {
+			_, parsedSubnet, _ := net.ParseCIDR(subnet)
+			parsedSubnets = append(parsedSubnets, parsedSubnet)
+		}
+	}
 	for _, myHost := range hostList {
 		// If we already have this host in our cache and it has a different ifid than we are currently processing, don't
 		// overwrite it, and print a warning.
 		if err = c.checkForDuplicateInterfaces(&myHost); err != nil {
 			fmt.Println(err)
 			continue
+		}
+		if len(parsedSubnets) > 0 {
+			validIP := false
+			parsedIP := net.ParseIP(myHost.IP)
+			for _, parsedSubnet := range parsedSubnets {
+				if parsedSubnet.Contains(parsedIP) {
+					validIP = true
+					break
+				}
+			}
+			if !validIP {
+				continue
+			}
 		}
 		if myHost.IfName, err = c.ResolveIfID(myHost.IfID); err != nil {
 			fmt.Printf("Could not resolve interface: %d, this should not happen", myHost.IfID)
