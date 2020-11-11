@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 const (
@@ -21,12 +22,34 @@ type Controller struct {
 	config   *config.Config
 	ifList   map[string]int
 	HostList map[string]ntopHost
+	stopChan <-chan struct{}
 }
 
-func CreateController(config *config.Config) Controller {
+func CreateController(config *config.Config, stopChan <-chan struct{}) Controller {
 	var controller Controller
 	controller.config = config
+	controller.stopChan = stopChan
 	return controller
+}
+
+func (c *Controller) RunController() {
+	scrapeInterval, err := time.ParseDuration(c.config.Ntopng.ScrapeInterval)
+	if err != nil {
+		fmt.Printf("was not able to parse duration: %s - %v", c.config.Ntopng.ScrapeInterval, err)
+		return
+	}
+	timer := time.NewTimer(scrapeInterval)
+	for {
+		select {
+			case <-timer.C:
+				if err := c.ScrapeHostEndpointForAllInterfaces(); err != nil {
+					fmt.Printf("encountered an error while scraping interfaces, we were likely stopped short: %v",
+						err)
+				}
+			case <-c.stopChan:
+				return
+		}
+	}
 }
 
 func (c *Controller) CacheInterfaceIds() error {

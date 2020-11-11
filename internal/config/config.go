@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/spf13/viper"
 	"net"
+	"time"
 )
 
 type ntopng struct {
@@ -11,6 +12,7 @@ type ntopng struct {
 	User     string
 	Password string
 	AuthMethod string
+	ScrapeInterval string
 }
 
 type host struct {
@@ -44,6 +46,7 @@ func ParseConfig() (Config, error) {
 	
 	// Set default values
 	viper.SetDefault("metric.excludeDNSMetrics", false)
+	viper.SetDefault("ntopng.scrapeInterval", "1m")
 
 	// Unmarshal config into struct
 	err = viper.Unmarshal(&config)
@@ -72,6 +75,9 @@ func (c *Config) validate() error {
 				return fmt.Errorf("subnet specified: '%s', is not a valid subnet: %v", subnet, err)
 			}
 		}
+	}
+	if _, err := time.ParseDuration(c.Ntopng.ScrapeInterval); err != nil {
+		return fmt.Errorf("was not able to parse configured duration: %s - %v", c.Ntopng.ScrapeInterval, err)
 	}
 	return nil
 }

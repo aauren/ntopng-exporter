@@ -3,6 +3,7 @@ ntopng:
   user: admin
   password: admin
   authMethod: cookie # cookie, basic, or none are accepted values
+  scrapeInterval: 15s # scrape from the ntopng API every x period of time (should be synced with your prometheus scrapes)
 
 host:
   interfacesToMonitor:
