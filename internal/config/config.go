@@ -77,10 +77,18 @@ func (c *Config) validate() error {
 }
 
 func (c Config) String() string {
-	configOutput := fmt.Sprintf("ntopng:\n\t%s", c.Ntopng)
+	configOutput := fmt.Sprintf("ntopng:\n%s\n\nhost:\n%s\n\nmetric:\n%s", c.Ntopng, c.Host, c.Metric)
 	return configOutput
 }
 
 func (n ntopng) String() string {
-	return fmt.Sprintf("%s: '%s'/'%s' - %s", n.EndPoint, n.User, n.Password, n.AuthMethod)
+	return fmt.Sprintf("\t%s: '%s'/'%s' - %s", n.EndPoint, n.User, n.Password, n.AuthMethod)
+}
+
+func (h host) String() string {
+	return fmt.Sprintf("\tInterface List: %v", h.InterfacesToMonitor)
+}
+
+func (m metric) String() string {
+	return fmt.Sprintf("\tLocal Subnets: %v\n\tExclude DNS Metrics? %t", m.LocalSubnetsOnly, m.ExcludeDNSMetrics)
 }
