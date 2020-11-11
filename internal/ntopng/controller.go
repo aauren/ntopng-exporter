@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/aauren/ntopng-exporter/internal/config"
 	"net/http"
+	"strconv"
 )
 
 const (
@@ -15,19 +16,19 @@ const (
 	interfaceCustomPath = "/ntopng/interfaces.lua"
 )
 
-type controller struct {
+type Controller struct {
 	config   config.Config
 	ifList   map[string]int
-	hostList map[string]ntopHost
+	HostList map[string]ntopHost
 }
 
-func CreateController(config config.Config) controller {
-	var controller controller
+func CreateController(config config.Config) Controller {
+	var controller Controller
 	controller.config = config
 	return controller
 }
 
-func (c *controller) CacheInterfaceIds() error {
+func (c *Controller) CacheInterfaceIds() error {
 	endpoint := fmt.Sprintf("%s%s%s", c.config.Ntopng.EndPoint, luaRestV1Get, interfaceCustomPath)
 	req, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
@@ -67,17 +68,16 @@ func (c *controller) CacheInterfaceIds() error {
 	return nil
 }
 
-func (c *controller) ScrapeHostEndpointForAllInterfaces() error {
+func (c *Controller) ScrapeHostEndpointForAllInterfaces() error {
 	for _, configuredIf := range c.config.Host.InterfacesToMonitor {
 		if err := c.scrapeHostEndpoint(c.ifList[configuredIf]); err != nil {
 			return fmt.Errorf("failed to scrape interface '%s' with error: %v", configuredIf, err)
 		}
 	}
-	fmt.Printf("\n\nFinal Host List: %s\n\n", c.hostList["192.168.1.50"])
 	return nil
 }
 
-func (c *controller) scrapeHostEndpoint(interfaceId int) error {
+func (c *Controller) scrapeHostEndpoint(interfaceId int) error {
 	endpoint := fmt.Sprintf("%s%s%s", c.config.Ntopng.EndPoint, luaRestV1Get, hostCustomPath)
 	payload := []byte(fmt.Sprintf(`{"ifid": %d, "field_alias": "%s"}`, interfaceId, hostCustomFields))
 	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(payload))
@@ -101,16 +101,26 @@ func (c *controller) scrapeHostEndpoint(interfaceId int) error {
 	if len(hostList) < 1 {
 		return fmt.Errorf("ntopng returned 0 hosts: %v", *body)
 	}
-	if c.hostList == nil {
-		c.hostList = make(map[string]ntopHost)
+	if c.HostList == nil {
+		c.HostList = make(map[string]ntopHost)
 	}
 	for _, myHost := range hostList {
-		c.hostList[myHost.IP] = myHost
+		// If we already have this host in our cache and it has a different ifid than we are currently processing, don't
+		// overwrite it, and print a warning.
+		if err = c.checkForDuplicateInterfaces(&myHost); err != nil {
+			fmt.Println(err)
+			continue
+		}
+		if myHost.IfName, err = c.ResolveIfID(myHost.IfID); err != nil {
+			fmt.Printf("Could not resolve interface: %d, this should not happen", myHost.IfID)
+			myHost.IfName = strconv.Itoa(myHost.IfID)
+		}
+		c.HostList[myHost.IP] = myHost
 	}
 	return err
 }
 
-func (c *controller) setCommonOptions(req *http.Request, isJsonRequest bool) {
+func (c *Controller) setCommonOptions(req *http.Request, isJsonRequest bool) {
 	if isJsonRequest {
 		req.Header.Add("Content-Type", "application/json")
 	}

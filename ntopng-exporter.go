@@ -3,7 +3,11 @@ package main
 import (
 	"fmt"
 	"github.com/aauren/ntopng-exporter/internal/config"
+	"github.com/aauren/ntopng-exporter/internal/metrics"
 	"github.com/aauren/ntopng-exporter/internal/ntopng"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"net/http"
 	"os"
 )
 
@@ -25,4 +29,16 @@ func main() {
 		fmt.Printf("failed to scrape host endpoint: %v\n", err)
 		os.Exit(3)
 	}
+	err = serveMetrics(&ntopControl)
+	if err != nil {
+		fmt.Printf("error while listening on metric port: %v\n", err)
+		os.Exit(4)
+	}
+}
+
+func serveMetrics(ntopController *ntopng.Controller) error {
+	ntopCollector := metrics.NewNtopNGCollector(ntopController)
+	prometheus.MustRegister(ntopCollector)
+	http.Handle("/metrics", promhttp.Handler())
+	return http.ListenAndServe(":3001", nil)
 }

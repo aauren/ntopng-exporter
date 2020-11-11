@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 )
 
 func getHttpResponseBody(req *http.Request) (*[]byte, int, error) {
@@ -33,4 +34,31 @@ func getRawJsonFromNtopResponse(body *[]byte) (json.RawMessage, error) {
 	}
 
 	return ntopResponse.Rsp, nil
+}
+
+func (c *Controller) checkForDuplicateInterfaces(myHost *ntopHost) error {
+	if host, ok := c.HostList[myHost.IP]; ok {
+		if host.IfID != myHost.IfID {
+			ifName1, err := c.ResolveIfID(host.IfID)
+			if err != nil {
+				ifName1 = strconv.Itoa(host.IfID)
+			}
+			ifName2, err := c.ResolveIfID(myHost.IfID)
+			if err != nil {
+				ifName2 = strconv.Itoa(myHost.IfID)
+			}
+			return fmt.Errorf("warning: host '%s' is already defined for two interfaces: '%s' & '%s', skipping",
+				myHost.IP, ifName1, ifName2)
+		}
+	}
+	return nil
+}
+
+func (c *Controller) ResolveIfID(inputIfID int) (string, error) {
+	for ifName, ifID := range c.ifList {
+		if ifID == inputIfID {
+			return ifName, nil
+		}
+	}
+	return "", fmt.Errorf("could not find an interface name for ifid: %d", inputIfID)
 }
