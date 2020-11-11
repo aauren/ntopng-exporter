@@ -9,27 +9,16 @@ import (
 )
 
 const (
-	luaRestV1Get = "/lua/rest/v1/get"
-	hostCustomFields = `ip,bytes.sent,bytes.rcvd,active_flows.as_client,active_flows.as_server,dns,num_alerts,mac,
-total_flows.as_client,total_flows.as_server,vlan,total_alerts,name`
-	hostCustomPath = "/host/custom_data.lua"
+	luaRestV1Get     = "/lua/rest/v1/get"
+	hostCustomFields = `ip,bytes.sent,bytes.rcvd,active_flows.as_client,active_flows.as_server,dns,num_alerts,mac,total_flows.as_client,total_flows.as_server,vlan,total_alerts,name,ifid`
+	hostCustomPath      = "/host/custom_data.lua"
 	interfaceCustomPath = "/ntopng/interfaces.lua"
 )
 
 type controller struct {
-	config config.Config
-	ifList map[string]int
-}
-
-type ntopInterfaces struct {
-	IfID int `json:"ifid"`
-	IfName string `json:"ifname"`
-}
-
-type ntopResponse struct {
-	RcStr string `json:"rc_str"`
-	Rc int
-	Rsp json.RawMessage
+	config   config.Config
+	ifList   map[string]int
+	hostList map[string]ntopHost
 }
 
 func CreateController(config config.Config) controller {
@@ -45,7 +34,7 @@ func (c *controller) CacheInterfaceIds() error {
 		return err
 	}
 	c.setCommonOptions(req, false)
-	
+
 	body, status, err := getHttpResponseBody(req)
 	if status != http.StatusOK {
 		return fmt.Errorf("request to interface endpoint was not successful. Status: '%d', Response: '%v'",
@@ -56,7 +45,7 @@ func (c *controller) CacheInterfaceIds() error {
 	if err != nil {
 		return err
 	}
-	var ifList []ntopInterfaces
+	var ifList []ntopInterface
 	err = json.Unmarshal(rawInterfaces, &ifList)
 	if err != nil {
 		return fmt.Errorf("was not able to parse interface list from ntopng: %v", err)
@@ -84,6 +73,7 @@ func (c *controller) ScrapeHostEndpointForAllInterfaces() error {
 			return fmt.Errorf("failed to scrape interface '%s' with error: %v", configuredIf, err)
 		}
 	}
+	fmt.Printf("\n\nFinal Host List: %s\n\n", c.hostList["192.168.1.50"])
 	return nil
 }
 
@@ -97,7 +87,26 @@ func (c *controller) scrapeHostEndpoint(interfaceId int) error {
 	c.setCommonOptions(req, true)
 
 	body, status, err := getHttpResponseBody(req)
-	fmt.Printf("Status - %d\n\nBody - %s", status, *body)
+	if status != http.StatusOK {
+		return fmt.Errorf("request to host endpoint was not successful. Status: '%d', Response: '%v'",
+			status, *body)
+	}
+
+	rawHosts, err := getRawJsonFromNtopResponse(body)
+	if err != nil {
+		return err
+	}
+	var hostList []ntopHost
+	err = json.Unmarshal(rawHosts, &hostList)
+	if len(hostList) < 1 {
+		return fmt.Errorf("ntopng returned 0 hosts: %v", *body)
+	}
+	if c.hostList == nil {
+		c.hostList = make(map[string]ntopHost)
+	}
+	for _, myHost := range hostList {
+		c.hostList[myHost.IP] = myHost
+	}
 	return err
 }
 
