@@ -18,12 +18,12 @@ const (
 )
 
 type Controller struct {
-	config   config.Config
+	config   *config.Config
 	ifList   map[string]int
 	HostList map[string]ntopHost
 }
 
-func CreateController(config config.Config) Controller {
+func CreateController(config *config.Config) Controller {
 	var controller Controller
 	controller.config = config
 	return controller

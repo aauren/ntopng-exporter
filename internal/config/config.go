@@ -19,6 +19,7 @@ type host struct {
 
 type metric struct {
 	LocalSubnetsOnly []string
+	ExcludeDNSMetrics bool
 }
 
 type Config struct {
@@ -28,6 +29,7 @@ type Config struct {
 }
 
 func ParseConfig() (Config, error) {
+	// Configure paths and read config
 	var config Config
 	viper.SetConfigName("ntopng-exporter")
 	viper.SetConfigType("yaml")
@@ -39,7 +41,11 @@ func ParseConfig() (Config, error) {
 	if err != nil {
 		return config, err
 	}
+	
+	// Set default values
+	viper.SetDefault("metric.excludeDNSMetrics", false)
 
+	// Unmarshal config into struct
 	err = viper.Unmarshal(&config)
 	if err != nil {
 		return config, err

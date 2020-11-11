@@ -1,20 +1,22 @@
 package metrics
 
 import (
+	"github.com/aauren/ntopng-exporter/internal/config"
 	"github.com/aauren/ntopng-exporter/internal/ntopng"
 	"github.com/prometheus/client_golang/prometheus"
 	"strconv"
 )
 
 var (
-	hostLabels = []string{"ip", "ifname", "mac", "name", "vlan"}
-	basicDNSLabels = deepAppend(hostLabels, "direction")
+	hostLabels       = []string{"ip", "ifname", "mac", "name", "vlan"}
+	basicDNSLabels   = deepAppend(hostLabels, "direction")
 	DNSRepliesLabels = deepAppend(basicDNSLabels, "status")
 	DNSQueriesLabels = deepAppend(basicDNSLabels, "record_type")
 )
 
 type ntopNGCollector struct {
 	ntopNGController  *ntopng.Controller
+	config            *config.Config
 	activeClientFlows *prometheus.Desc
 	activeServerFlows *prometheus.Desc
 	bytesRcvd         *prometheus.Desc
@@ -28,9 +30,10 @@ type ntopNGCollector struct {
 	totalServerFlows  *prometheus.Desc
 }
 
-func NewNtopNGCollector(ntopController *ntopng.Controller) *ntopNGCollector {
+func NewNtopNGCollector(ntopController *ntopng.Controller, config *config.Config) *ntopNGCollector {
 	return &ntopNGCollector{
 		ntopNGController: ntopController,
+		config: config,
 		bytesRcvd: prometheus.NewDesc(
 			prometheus.BuildFQName("ntopng", "", "bytes_rcvd"),
 			"number of bytes received for host",
@@ -46,7 +49,7 @@ func NewNtopNGCollector(ntopController *ntopng.Controller) *ntopNGCollector {
 			"current number of active client flows for host",
 			hostLabels,
 			nil),
-		activeServerFlows: 	prometheus.NewDesc(
+		activeServerFlows: prometheus.NewDesc(
 			prometheus.BuildFQName("ntopng", "", "active_server_flows"),
 			"current number of active server flows for host",
 			hostLabels,
@@ -113,8 +116,10 @@ func (c *ntopNGCollector) Collect(ch chan<- prometheus.Metric) {
 			hostLabelValues...)
 		ch <- prometheus.MustNewConstMetric(c.activeServerFlows, prometheus.GaugeValue, host.ActiveFlowsAsServer,
 			hostLabelValues...)
-		c.outputDNSMetric(ch, "received", &host.DNS.Received, hostLabelValues)
-		c.outputDNSMetric(ch, "sent", &host.DNS.Sent, hostLabelValues)
+		if !c.config.Metric.ExcludeDNSMetrics {
+			c.outputDNSMetric(ch, "received", &host.DNS.Received, hostLabelValues)
+			c.outputDNSMetric(ch, "sent", &host.DNS.Sent, hostLabelValues)
+		}
 		ch <- prometheus.MustNewConstMetric(c.numAlerts, prometheus.GaugeValue, host.NumAlerts,
 			hostLabelValues...)
 		ch <- prometheus.MustNewConstMetric(c.totalAlerts, prometheus.CounterValue, host.TotalAlerts,

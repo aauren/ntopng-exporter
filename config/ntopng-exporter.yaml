@@ -11,3 +11,5 @@ host:
 metric:
   localSubnetsOnly: # if this is defined, only include the local subnets defined here (greatly reduces number of metrics)
   - "192.168.0.0/24"
+  - "224.0.0.0/4"
+  excludeDNSMetrics: false # set to true, if you don't care about DNS metrics (also reduces number of metrics)
