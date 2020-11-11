@@ -35,11 +35,11 @@ type ntopHost struct {
 }
 
 type ntopDNS struct {
-	Received ntopDNSSub `json:"rcvd"`
-	Sent     ntopDNSSub `json:"sent"`
+	Received NtopDNSSub `json:"rcvd"`
+	Sent     NtopDNSSub `json:"sent"`
 }
 
-type ntopDNSSub struct {
+type NtopDNSSub struct {
 	NumQueries      float64         `json:"num_queries"`
 	NumRepliesError float64         `json:"num_replies error"`
 	NumRepliesOK    float64         `json:"num_replies ok"`
