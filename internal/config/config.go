@@ -62,7 +62,7 @@ func ParseConfig() (Config, error) {
 	if err != nil {
 		return config, err
 	}
-	//err = Config.validate()
+	err = config.validate()
 	return config, err
 }
 
