@@ -3,7 +3,7 @@ ntopng:
   user: admin
   password: admin
   authMethod: cookie # cookie, basic, or none are accepted values
-  scrapeInterval: 15s # scrape from the ntopng API every x period of time (should be synced with your prometheus scrapes)
+  scrapeInterval: 15s # scrape from the ntopng API every x period of time (should be synced with your prometheus scrapes) (default: 1 minute)
 
 host:
   interfacesToMonitor:
@@ -13,4 +13,7 @@ metric:
   localSubnetsOnly: # if this is defined, only include the local subnets defined here (greatly reduces number of metrics)
   - "192.168.0.0/24"
   - "224.0.0.0/4"
-  excludeDNSMetrics: false # set to true, if you don't care about DNS metrics (also reduces number of metrics)
+  excludeDNSMetrics: false # set to true, if you don't care about DNS metrics (also reduces number of metrics) (default: false)
+  serve:
+    ip: 0.0.0.0 # IP to serve metrics on, 0.0.0.0 is all interfaces (default: 0.0.0.0)
+    port: 3001 # port to serve metrics on (default: 3001)

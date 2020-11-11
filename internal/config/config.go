@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/spf13/viper"
 	"net"
+	"strings"
 	"time"
 )
 
@@ -22,6 +23,12 @@ type host struct {
 type metric struct {
 	LocalSubnetsOnly []string
 	ExcludeDNSMetrics bool
+	Serve metricServe
+}
+
+type metricServe struct {
+	IP string
+	Port int
 }
 
 type Config struct {
@@ -47,6 +54,8 @@ func ParseConfig() (Config, error) {
 	// Set default values
 	viper.SetDefault("metric.excludeDNSMetrics", false)
 	viper.SetDefault("ntopng.scrapeInterval", "1m")
+	viper.SetDefault("ntopng.metric.serve.ip", "0.0.0.0")
+	viper.SetDefault("ntopng.metric.serve.port", 3001)
 
 	// Unmarshal config into struct
 	err = viper.Unmarshal(&config)
@@ -61,7 +70,7 @@ func (c *Config) validate() error {
 	if c.Ntopng.AuthMethod != "cookie" && c.Ntopng.AuthMethod != "basic" && c.Ntopng.AuthMethod != "none" {
 		return fmt.Errorf("ntopng authMethod must be either cookie, basic, or none")
 	}
-	if c.Host.InterfacesToMonitor != nil || len(c.Host.InterfacesToMonitor) < 1 {
+	if c.Host.InterfacesToMonitor == nil || len(c.Host.InterfacesToMonitor) < 1 {
 		return fmt.Errorf("must specify at least one interface to monitor")
 	}
 	for _, ifName := range c.Host.InterfacesToMonitor {
@@ -78,6 +87,21 @@ func (c *Config) validate() error {
 	}
 	if _, err := time.ParseDuration(c.Ntopng.ScrapeInterval); err != nil {
 		return fmt.Errorf("was not able to parse configured duration: %s - %v", c.Ntopng.ScrapeInterval, err)
+	}
+	if c.Metric.Serve.IP != "0.0.0.0" {
+		addrs, err := net.InterfaceAddrs()
+		if err != nil {
+			return fmt.Errorf("was not able to get list of interface addresses: %v", err)
+		}
+		foundIP := false
+		for _, addr := range addrs {
+			if strings.Contains(addr.String(), c.Metric.Serve.IP) {
+				foundIP = true
+			}
+		}
+		if !foundIP {
+			return fmt.Errorf("it looks like address isn't present on the host to bind to: %s", c.Metric.Serve.IP)
+		}
 	}
 	return nil
 }
@@ -96,5 +120,10 @@ func (h host) String() string {
 }
 
 func (m metric) String() string {
-	return fmt.Sprintf("\tLocal Subnets: %v\n\tExclude DNS Metrics? %t", m.LocalSubnetsOnly, m.ExcludeDNSMetrics)
+	return fmt.Sprintf("\tLocal Subnets: %v\n\tExclude DNS Metrics? %t\n\tServe:\n%s",
+		m.LocalSubnetsOnly, m.ExcludeDNSMetrics, m.Serve)
+}
+
+func (ms metricServe) String() string {
+	return fmt.Sprintf("\t\tIP: %s\n\t\tPort: %d", ms.IP, ms.Port)
 }

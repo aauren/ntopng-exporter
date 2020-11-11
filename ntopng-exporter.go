@@ -27,9 +27,6 @@ func main() {
 	// Setup channel for stopping work when done
 	stopChan := make(chan struct{})
 
-	// Setup graceful shutdown
-
-
 	// Setup ntopng scrape controller and prime cache, then start it running asynchronously
 	ntopControl := ntopng.CreateController(&myConfig, stopChan)
 	err = ntopControl.CacheInterfaceIds()
@@ -70,7 +67,7 @@ func serveMetrics(ntopController *ntopng.Controller, config *config.Config) *htt
 	mux.Handle("/metrics", promhttp.Handler())
 
 	srv := &http.Server {
-		Addr: ":3001",
+		Addr: fmt.Sprintf("%s:%d", config.Metric.Serve.IP, config.Metric.Serve.Port),
 		Handler: mux,
 	}
 	go func(srv *http.Server) {
