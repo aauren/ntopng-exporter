@@ -1,0 +1,13 @@
+[Unit]
+Description=Exports Metrics for ntopng
+After=ntopng.service
+StartLimitIntervalSec=30
+StartLimitBurst=5
+
+[Service]
+ExecStart=/usr/local/bin/ntopng-exporter
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
