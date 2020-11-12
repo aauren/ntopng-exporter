@@ -107,6 +107,8 @@ func (c *ntopNGCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (c *ntopNGCollector) Collect(ch chan<- prometheus.Metric) {
+	c.ntopNGController.HostListMutex.RLock()
+	defer c.ntopNGController.HostListMutex.RUnlock()
 	for _, host := range c.ntopNGController.HostList {
 		var hostLabelValues = []string{host.IP, host.IfName, host.MAC, host.Name, strconv.Itoa(host.VLAN)}
 		ch <- prometheus.MustNewConstMetric(c.bytesSent, prometheus.CounterValue, host.BytesSent, hostLabelValues...)

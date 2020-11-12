@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -22,6 +23,7 @@ type Controller struct {
 	config   *config.Config
 	ifList   map[string]int
 	HostList map[string]ntopHost
+	HostListMutex *sync.RWMutex
 	stopChan <-chan struct{}
 }
 
@@ -29,6 +31,7 @@ func CreateController(config *config.Config, stopChan <-chan struct{}) Controlle
 	var controller Controller
 	controller.config = config
 	controller.stopChan = stopChan
+	controller.HostListMutex = &sync.RWMutex{}
 	return controller
 }
 
@@ -93,15 +96,21 @@ func (c *Controller) CacheInterfaceIds() error {
 }
 
 func (c *Controller) ScrapeHostEndpointForAllInterfaces() error {
+	// tempNtopHosts is made here to minimize the amount of time we have to lock the list and also to make sure that we
+	// don't keep a list of ever growing hosts in our map which could eventually overwhelm the system
+	tempNtopHosts := make(map[string]ntopHost)
 	for _, configuredIf := range c.config.Host.InterfacesToMonitor {
-		if err := c.scrapeHostEndpoint(c.ifList[configuredIf]); err != nil {
+		if err := c.scrapeHostEndpoint(c.ifList[configuredIf], tempNtopHosts); err != nil {
 			return fmt.Errorf("failed to scrape interface '%s' with error: %v", configuredIf, err)
 		}
 	}
+	c.HostListMutex.Lock()
+	defer c.HostListMutex.Unlock()
+	c.HostList = tempNtopHosts
 	return nil
 }
 
-func (c *Controller) scrapeHostEndpoint(interfaceId int) error {
+func (c *Controller) scrapeHostEndpoint(interfaceId int, tempNtopHosts map[string]ntopHost) error {
 	endpoint := fmt.Sprintf("%s%s%s", c.config.Ntopng.EndPoint, luaRestV1Get, hostCustomPath)
 	payload := []byte(fmt.Sprintf(`{"ifid": %d, "field_alias": "%s"}`, interfaceId, hostCustomFields))
 	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(payload))
@@ -124,9 +133,6 @@ func (c *Controller) scrapeHostEndpoint(interfaceId int) error {
 	err = json.Unmarshal(rawHosts, &hostList)
 	if len(hostList) < 1 {
 		return fmt.Errorf("ntopng returned 0 hosts: %v", *body)
-	}
-	if c.HostList == nil {
-		c.HostList = make(map[string]ntopHost)
 	}
 	var parsedSubnets []*net.IPNet
 	if c.config.Metric.LocalSubnetsOnly != nil && len(c.config.Metric.LocalSubnetsOnly) > 0 {
@@ -159,7 +165,7 @@ func (c *Controller) scrapeHostEndpoint(interfaceId int) error {
 			fmt.Printf("Could not resolve interface: %d, this should not happen", myHost.IfID)
 			myHost.IfName = strconv.Itoa(myHost.IfID)
 		}
-		c.HostList[myHost.IP] = myHost
+		tempNtopHosts[myHost.IP] = myHost
 	}
 	return err
 }
