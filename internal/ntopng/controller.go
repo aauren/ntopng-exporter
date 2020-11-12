@@ -41,10 +41,11 @@ func (c *Controller) RunController() {
 		fmt.Printf("was not able to parse duration: %s - %v", c.config.Ntopng.ScrapeInterval, err)
 		return
 	}
-	timer := time.NewTimer(scrapeInterval)
+	ticker := time.NewTicker(scrapeInterval)
 	for {
 		select {
-			case <-timer.C:
+			case <-ticker.C:
+				fmt.Printf("scrap interval hit: scraping from ntop\n")
 				if err := c.ScrapeHostEndpointForAllInterfaces(); err != nil {
 					fmt.Printf("encountered an error while scraping interfaces, we were likely stopped short: %v",
 						err)
