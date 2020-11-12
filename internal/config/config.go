@@ -112,7 +112,8 @@ func (c Config) String() string {
 }
 
 func (n ntopng) String() string {
-	return fmt.Sprintf("\t%s: '%s'/'%s' - %s", n.EndPoint, n.User, n.Password, n.AuthMethod)
+	return fmt.Sprintf("\t%s: '%s'/'%s' - %s\n\tScrape Interval: %s",
+		n.EndPoint, n.User, n.Password, n.AuthMethod, n.ScrapeInterval)
 }
 
 func (h host) String() string {
