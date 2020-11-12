@@ -1,20 +1,32 @@
 before:
   hooks:
-    - go mod download
+  - go mod download
 builds:
-  - env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - windows
-      - darwin
+- env:
+  - CGO_ENABLED=0
+  goos:
+  - linux
+  - windows
+  - darwin
+  goarch:
+  - arm64
+  - amd64
+  - 386
 archives:
-  - replacements:
-      darwin: Darwin
-      linux: Linux
-      windows: Windows
-      386: i386
-      amd64: x86_64
+- replacements:
+    darwin: MacOS
+    linux: Linux
+    windows: Windows
+    386: i386
+  format_overrides:
+  - goos: windows
+    format: zip
+  files:
+  - config/*
+  - resources/ntopng-exporter.service
+  - LICENSE*
+  - README*
+  wrap_in_directory: ntopng-exporter-{{ .Version }}
 checksum:
   name_template: 'checksums.txt'
 snapshot:
