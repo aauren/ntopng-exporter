@@ -14,7 +14,7 @@ import (
 
 const (
 	luaRestV1Get     = "/lua/rest/v1/get"
-	hostCustomFields = `ip,bytes.sent,bytes.rcvd,active_flows.as_client,active_flows.as_server,dns,num_alerts,mac,total_flows.as_client,total_flows.as_server,vlan,total_alerts,name,ifid`
+	hostCustomFields = `ip,bytes.sent,bytes.rcvd,active_flows.as_client,active_flows.as_server,dns,num_alerts,mac,total_flows.as_client,total_flows.as_server,vlan,total_alerts,name,ifid,packets.rcvd,packets.sent`
 	hostCustomPath      = "/host/custom_data.lua"
 	interfaceCustomPath = "/ntopng/interfaces.lua"
 )

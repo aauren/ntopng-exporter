@@ -28,6 +28,8 @@ type ntopHost struct {
 	MAC                 string  `json:"mac"`
 	Name                string  `json:"name"`
 	NumAlerts           float64  `json:"num_alerts"`
+	PacketsReceived		float64  `json:"packets.rcvd"`
+	PacketsSent			float64  `json:"packets.sent"`
 	TotalAlerts         float64  `json:"total_alerts"`
 	TotalFlowsAsClient  float64  `json:"total_flows.as_client"`
 	TotalFlowsAsServer  float64  `json:"total_flows.as_server"`
