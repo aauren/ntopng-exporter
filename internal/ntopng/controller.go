@@ -13,18 +13,18 @@ import (
 )
 
 const (
-	luaRestV1Get     = "/lua/rest/v1/get"
-	hostCustomFields = `ip,bytes.sent,bytes.rcvd,active_flows.as_client,active_flows.as_server,dns,num_alerts,mac,total_flows.as_client,total_flows.as_server,vlan,total_alerts,name,ifid,packets.rcvd,packets.sent`
+	luaRestV1Get        = "/lua/rest/v1/get"
+	hostCustomFields    = `ip,bytes.sent,bytes.rcvd,active_flows.as_client,active_flows.as_server,dns,num_alerts,mac,total_flows.as_client,total_flows.as_server,vlan,total_alerts,name,ifid,packets.rcvd,packets.sent`
 	hostCustomPath      = "/host/custom_data.lua"
 	interfaceCustomPath = "/ntopng/interfaces.lua"
 )
 
 type Controller struct {
-	config   *config.Config
-	ifList   map[string]int
-	HostList map[string]ntopHost
+	config        *config.Config
+	ifList        map[string]int
+	HostList      map[string]ntopHost
 	HostListMutex *sync.RWMutex
-	stopChan <-chan struct{}
+	stopChan      <-chan struct{}
 }
 
 func CreateController(config *config.Config, stopChan <-chan struct{}) Controller {
@@ -44,14 +44,14 @@ func (c *Controller) RunController() {
 	ticker := time.NewTicker(scrapeInterval)
 	for {
 		select {
-			case <-ticker.C:
-				fmt.Printf("scrap interval hit: scraping from ntop\n")
-				if err := c.ScrapeHostEndpointForAllInterfaces(); err != nil {
-					fmt.Printf("encountered an error while scraping interfaces, we were likely stopped short: %v",
-						err)
-				}
-			case <-c.stopChan:
-				return
+		case <-ticker.C:
+			fmt.Printf("scrap interval hit: scraping from ntop\n")
+			if err := c.ScrapeHostEndpointForAllInterfaces(); err != nil {
+				fmt.Printf("encountered an error while scraping interfaces, we were likely stopped short: %v",
+					err)
+			}
+		case <-c.stopChan:
+			return
 		}
 	}
 }

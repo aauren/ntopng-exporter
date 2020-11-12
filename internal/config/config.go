@@ -9,10 +9,10 @@ import (
 )
 
 type ntopng struct {
-	EndPoint string
-	User     string
-	Password string
-	AuthMethod string
+	EndPoint       string
+	User           string
+	Password       string
+	AuthMethod     string
 	ScrapeInterval string
 }
 
@@ -21,19 +21,19 @@ type host struct {
 }
 
 type metric struct {
-	LocalSubnetsOnly []string
+	LocalSubnetsOnly  []string
 	ExcludeDNSMetrics bool
-	Serve metricServe
+	Serve             metricServe
 }
 
 type metricServe struct {
-	IP string
+	IP   string
 	Port int
 }
 
 type Config struct {
 	Ntopng ntopng
-	Host host
+	Host   host
 	Metric metric
 }
 
@@ -50,7 +50,7 @@ func ParseConfig() (Config, error) {
 	if err != nil {
 		return config, err
 	}
-	
+
 	// Set default values
 	viper.SetDefault("metric.excludeDNSMetrics", false)
 	viper.SetDefault("ntopng.scrapeInterval", "1m")

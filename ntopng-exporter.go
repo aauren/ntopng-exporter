@@ -66,8 +66,8 @@ func serveMetrics(ntopController *ntopng.Controller, config *config.Config) *htt
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 
-	srv := &http.Server {
-		Addr: fmt.Sprintf("%s:%d", config.Metric.Serve.IP, config.Metric.Serve.Port),
+	srv := &http.Server{
+		Addr:    fmt.Sprintf("%s:%d", config.Metric.Serve.IP, config.Metric.Serve.Port),
 		Handler: mux,
 	}
 	go func(srv *http.Server) {

@@ -23,8 +23,8 @@ type ntopNGCollector struct {
 	bytesSent         *prometheus.Desc
 	DNSQueryTypes     *prometheus.Desc
 	numAlerts         *prometheus.Desc
-	packetsRcvd 	  *prometheus.Desc
-	packetsSent		  *prometheus.Desc
+	packetsRcvd       *prometheus.Desc
+	packetsSent       *prometheus.Desc
 	totalAlerts       *prometheus.Desc
 	totalClientFlows  *prometheus.Desc
 	totalDNSQueries   *prometheus.Desc
@@ -35,7 +35,7 @@ type ntopNGCollector struct {
 func NewNtopNGCollector(ntopController *ntopng.Controller, config *config.Config) *ntopNGCollector {
 	return &ntopNGCollector{
 		ntopNGController: ntopController,
-		config: config,
+		config:           config,
 		activeClientFlows: prometheus.NewDesc(
 			prometheus.BuildFQName("ntopng", "", "active_client_flows"),
 			"current number of active client flows for host",

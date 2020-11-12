@@ -17,22 +17,22 @@ type ntopInterface struct {
 }
 
 type ntopHost struct {
-	ActiveFlowsAsClient float64  `json:"active_flows.as_client"`
-	ActiveFlowsAsServer float64  `json:"active_flows.as_server"`
-	BytesReceived       float64  `json:"bytes.rcvd"`
-	BytesSent           float64  `json:"bytes.sent"`
+	ActiveFlowsAsClient float64 `json:"active_flows.as_client"`
+	ActiveFlowsAsServer float64 `json:"active_flows.as_server"`
+	BytesReceived       float64 `json:"bytes.rcvd"`
+	BytesSent           float64 `json:"bytes.sent"`
 	DNS                 ntopDNS `json:"dns"`
 	IfID                int     `json:"ifid"`
-	IfName 				string	`json:ifname`
+	IfName              string  `json:ifname`
 	IP                  string  `json:"IP"`
 	MAC                 string  `json:"mac"`
 	Name                string  `json:"name"`
-	NumAlerts           float64  `json:"num_alerts"`
-	PacketsReceived		float64  `json:"packets.rcvd"`
-	PacketsSent			float64  `json:"packets.sent"`
-	TotalAlerts         float64  `json:"total_alerts"`
-	TotalFlowsAsClient  float64  `json:"total_flows.as_client"`
-	TotalFlowsAsServer  float64  `json:"total_flows.as_server"`
+	NumAlerts           float64 `json:"num_alerts"`
+	PacketsReceived     float64 `json:"packets.rcvd"`
+	PacketsSent         float64 `json:"packets.sent"`
+	TotalAlerts         float64 `json:"total_alerts"`
+	TotalFlowsAsClient  float64 `json:"total_flows.as_client"`
+	TotalFlowsAsServer  float64 `json:"total_flows.as_server"`
 	VLAN                int     `json:"vlan"`
 }
 
@@ -42,9 +42,9 @@ type ntopDNS struct {
 }
 
 type NtopDNSSub struct {
-	NumQueries      float64         `json:"num_queries"`
-	NumRepliesError float64         `json:"num_replies error"`
-	NumRepliesOK    float64         `json:"num_replies ok"`
+	NumQueries      float64        `json:"num_queries"`
+	NumRepliesError float64        `json:"num_replies error"`
+	NumRepliesOK    float64        `json:"num_replies ok"`
 	Queries         ntopDNSQueries `json:"queries"`
 }
 
