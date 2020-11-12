@@ -1,4 +1,4 @@
-package metrics
+package prometheus
 
 import (
 	"github.com/aauren/ntopng-exporter/internal/config"
@@ -14,7 +14,7 @@ var (
 	DNSQueriesLabels = deepAppend(basicDNSLabels, "record_type")
 )
 
-type ntopNGCollector struct {
+type hostCollector struct {
 	ntopNGController  *ntopng.Controller
 	config            *config.Config
 	activeClientFlows *prometheus.Desc
@@ -32,79 +32,79 @@ type ntopNGCollector struct {
 	totalServerFlows  *prometheus.Desc
 }
 
-func NewNtopNGCollector(ntopController *ntopng.Controller, config *config.Config) *ntopNGCollector {
-	return &ntopNGCollector{
+func NewNtopNGHostCollector(ntopController *ntopng.Controller, config *config.Config) *hostCollector {
+	return &hostCollector{
 		ntopNGController: ntopController,
 		config:           config,
 		activeClientFlows: prometheus.NewDesc(
-			prometheus.BuildFQName("ntopng", "", "active_client_flows"),
+			prometheus.BuildFQName("ntopng", "host", "active_client_flows"),
 			"current number of active client flows for host",
 			hostLabels,
 			nil),
 		activeServerFlows: prometheus.NewDesc(
-			prometheus.BuildFQName("ntopng", "", "active_server_flows"),
+			prometheus.BuildFQName("ntopng", "host", "active_server_flows"),
 			"current number of active server flows for host",
 			hostLabels,
 			nil),
 		bytesRcvd: prometheus.NewDesc(
-			prometheus.BuildFQName("ntopng", "", "bytes_rcvd"),
+			prometheus.BuildFQName("ntopng", "host", "bytes_rcvd"),
 			"number of bytes received for host",
 			hostLabels,
 			nil),
 		bytesSent: prometheus.NewDesc(
-			prometheus.BuildFQName("ntopng", "", "bytes_sent"),
+			prometheus.BuildFQName("ntopng", "host", "bytes_sent"),
 			"number of bytes sent for host",
 			hostLabels,
 			nil),
 		DNSQueryTypes: prometheus.NewDesc(
-			prometheus.BuildFQName("ntopng", "", "dns_queries_by_type"),
+			prometheus.BuildFQName("ntopng", "host", "dns_queries_by_type"),
 			"total number of DNS queries by record type",
 			DNSQueriesLabels,
 			nil),
 		numAlerts: prometheus.NewDesc(
-			prometheus.BuildFQName("ntopng", "", "num_alerts"),
+			prometheus.BuildFQName("ntopng", "host", "num_alerts"),
 			"number of alerts for host",
 			hostLabels,
 			nil),
 		packetsRcvd: prometheus.NewDesc(
-			prometheus.BuildFQName("ntopng", "", "packets_rcvd"),
+			prometheus.BuildFQName("ntopng", "host", "packets_rcvd"),
 			"number of packets received for host",
 			hostLabels,
 			nil),
 		packetsSent: prometheus.NewDesc(
-			prometheus.BuildFQName("ntopng", "", "packets_sent"),
+			prometheus.BuildFQName("ntopng", "host", "packets_sent"),
 			"number of packets sent for host",
 			hostLabels,
 			nil),
 		totalAlerts: prometheus.NewDesc(
-			prometheus.BuildFQName("ntopng", "", "total_alerts"),
+			prometheus.BuildFQName("ntopng", "host", "total_alerts"),
 			"total number of alerts for host",
 			hostLabels,
 			nil),
 		totalClientFlows: prometheus.NewDesc(
-			prometheus.BuildFQName("ntopng", "", "total_client_flows"),
+			prometheus.BuildFQName("ntopng", "host", "total_client_flows"),
 			"total number of client flows for host",
 			hostLabels,
 			nil),
 		totalDNSQueries: prometheus.NewDesc(
-			prometheus.BuildFQName("ntopng", "", "total_dns_queries"),
+			prometheus.BuildFQName("ntopng", "host", "total_dns_queries"),
 			"total number of DNS queries for host",
 			basicDNSLabels,
 			nil),
 		totalDNSReplies: prometheus.NewDesc(
-			prometheus.BuildFQName("ntopng", "", "total_dns_replies"),
+			prometheus.BuildFQName("ntopng", "host", "total_dns_replies"),
 			"total number of DNS replies for host by status",
 			DNSRepliesLabels,
 			nil),
 		totalServerFlows: prometheus.NewDesc(
-			prometheus.BuildFQName("ntopng", "", "total_server_flows"),
+			prometheus.BuildFQName("ntopng", "host", "total_server_flows"),
 			"total number of server flows for host",
 			hostLabels,
 			nil),
 	}
 }
 
-func (c *ntopNGCollector) Describe(ch chan<- *prometheus.Desc) {
+func (c *hostCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.bytesRcvd
 	ch <- c.bytesSent
 	ch <- c.activeClientFlows
@@ -118,9 +118,9 @@ func (c *ntopNGCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.totalServerFlows
 }
 
-func (c *ntopNGCollector) Collect(ch chan<- prometheus.Metric) {
-	c.ntopNGController.HostListMutex.RLock()
-	defer c.ntopNGController.HostListMutex.RUnlock()
+func (c *hostCollector) Collect(ch chan<- prometheus.Metric) {
+	c.ntopNGController.ListRWMutex.RLock()
+	defer c.ntopNGController.ListRWMutex.RUnlock()
 	for _, host := range c.ntopNGController.HostList {
 		var hostLabelValues = []string{host.IP, host.IfName, host.MAC, host.Name, strconv.Itoa(host.VLAN)}
 		ch <- prometheus.MustNewConstMetric(c.activeClientFlows, prometheus.GaugeValue, host.ActiveFlowsAsClient,
@@ -149,7 +149,7 @@ func (c *ntopNGCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (c *ntopNGCollector) outputDNSMetric(ch chan<- prometheus.Metric, direction string, dns *ntopng.NtopDNSSub,
+func (c *hostCollector) outputDNSMetric(ch chan<- prometheus.Metric, direction string, dns *ntopng.NtopDNSSub,
 	hostLabels []string) {
 	dnsLabels := append(hostLabels, direction)
 	ch <- prometheus.MustNewConstMetric(c.totalDNSQueries, prometheus.CounterValue, dns.NumQueries,
@@ -178,11 +178,4 @@ func (c *ntopNGCollector) outputDNSMetric(ch chan<- prometheus.Metric, direction
 		deepAppend(dnsLabels, "SOA")...)
 	ch <- prometheus.MustNewConstMetric(c.DNSQueryTypes, prometheus.CounterValue, dns.Queries.NumTXT,
 		deepAppend(dnsLabels, "TXT")...)
-}
-
-func deepAppend(src []string, appends ...string) []string {
-	newList := make([]string, len(src))
-	_ = copy(newList, src)
-	newList = append(newList, appends...)
-	return newList
 }

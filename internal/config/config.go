@@ -8,12 +8,28 @@ import (
 	"time"
 )
 
+const (
+	AllScrape       = "all"
+	HostScrape      = "hosts"
+	InterfaceScrape = "interfaces"
+	L7Protocols     = "l7protocols"
+)
+
+var (
+	AvailableScrapeTargets = map[string]bool{
+		AllScrape:       true,
+		HostScrape:      true,
+		InterfaceScrape: true,
+		L7Protocols:     true}
+)
+
 type ntopng struct {
 	EndPoint       string
 	User           string
 	Password       string
 	AuthMethod     string
 	ScrapeInterval string
+	ScrapeTargets  []string
 }
 
 type host struct {
@@ -56,6 +72,7 @@ func ParseConfig() (Config, error) {
 	viper.SetDefault("ntopng.scrapeInterval", "1m")
 	viper.SetDefault("ntopng.metric.serve.ip", "0.0.0.0")
 	viper.SetDefault("ntopng.metric.serve.port", 3001)
+	viper.SetDefault("ntopng.scrapeTargets", "all")
 
 	// Unmarshal config into struct
 	err = viper.Unmarshal(&config)
@@ -103,6 +120,15 @@ func (c *Config) validate() error {
 			return fmt.Errorf("it looks like address isn't present on the host to bind to: %s", c.Metric.Serve.IP)
 		}
 	}
+	if len(c.Ntopng.ScrapeTargets) < 1 {
+		return fmt.Errorf("you must specify at least one scrape target in the config")
+	}
+	for _, target := range c.Ntopng.ScrapeTargets {
+		if !AvailableScrapeTargets[target] {
+			return fmt.Errorf("'%s' is not an available scrape target: %v",
+				target, AvailableScrapeTargets)
+		}
+	}
 	return nil
 }
 
@@ -112,8 +138,8 @@ func (c Config) String() string {
 }
 
 func (n ntopng) String() string {
-	return fmt.Sprintf("\t%s: '%s'/'%s' - %s\n\tScrape Interval: %s",
-		n.EndPoint, n.User, n.Password, n.AuthMethod, n.ScrapeInterval)
+	return fmt.Sprintf("\t%s: '%s'/'%s' - %s\n\tScrape Interval: %s\n\tScrape Targets: %s",
+		n.EndPoint, n.User, n.Password, n.AuthMethod, n.ScrapeInterval, n.ScrapeTargets)
 }
 
 func (h host) String() string {

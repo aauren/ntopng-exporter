@@ -61,7 +61,48 @@ type ntopDNSQueries struct {
 	NumTXT   float64 `json:"num_txt"`
 }
 
+type ntopInterfaceFull struct {
+	AlertedFlows        float64            `json:"alerted_flows"`
+	AlertedFlowsError   float64            `json:"alerted_flows_error"`
+	AlertedFlowsNotice  float64            `json:"alerted_flows_notice"`
+	AlertedFlowsWarning float64            `json:"alerted_flows_warning"`
+	BytesReceived       float64            `json:"bytes_download"`
+	BytesSent           float64            `json:"bytes_upload"`
+	Drops               float64            `json:"drops"`
+	IfID                string             `json:"ifid"`
+	IfName              string             `json:"ifname"`
+	NumDevices          float64            `json:"num_devices"`
+	NumHosts            float64            `json:"num_hosts"`
+	NumLocalHosts       float64            `json:"num_local_hosts"`
+	PacketsReceived     float64            `json:"packets_download"`
+	PacketsSent         float64            `json:"packets_upload"`
+	Speed               float64            `json:"speed"`
+	TCPPacketStats      ntopTCPPacketStats `json:"tcpPacketStats"`
+	Throughput          ntopThroughput     `json:"throughput"`
+}
+
+type ntopTCPPacketStats struct {
+	Lost            float64 `json:"lost"`
+	OutOfOrder      float64 `json:"out_of_order"`
+	Retransmissions float64 `json:"retransmissions"`
+}
+
+type ntopThroughput struct {
+	Download ntopThroughputSub `json:"download"`
+	Upload   ntopThroughputSub `json:"upload"`
+}
+
+type ntopThroughputSub struct {
+	BPS float64 `json:"bps"`
+	PPS float64 `json:"pps"`
+}
+
 func (n ntopHost) String() string {
+	output, _ := json.MarshalIndent(n, "", "\t")
+	return fmt.Sprintf("%s", output)
+}
+
+func (n ntopInterfaceFull) String() string {
 	output, _ := json.MarshalIndent(n, "", "\t")
 	return fmt.Sprintf("%s", output)
 }

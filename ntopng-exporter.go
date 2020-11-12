@@ -3,8 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/aauren/ntopng-exporter/internal"
 	"github.com/aauren/ntopng-exporter/internal/config"
-	"github.com/aauren/ntopng-exporter/internal/metrics"
+	ntopPrometheus "github.com/aauren/ntopng-exporter/internal/metrics/prometheus"
 	"github.com/aauren/ntopng-exporter/internal/ntopng"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -34,11 +35,7 @@ func main() {
 		fmt.Printf("failed to cache interface ids: %v\n", err)
 		os.Exit(2)
 	}
-	err = ntopControl.ScrapeHostEndpointForAllInterfaces()
-	if err != nil {
-		fmt.Printf("failed to scrape host endpoint: %v\n", err)
-		os.Exit(3)
-	}
+	ntopControl.ScrapeAllConfiguredTargets()
 	go ntopControl.RunController()
 
 	// Setup goroutine for serving traffic
@@ -60,14 +57,22 @@ func main() {
 	fmt.Printf("\nGoodbye")
 }
 
-func serveMetrics(ntopController *ntopng.Controller, config *config.Config) *http.Server {
-	ntopCollector := metrics.NewNtopNGCollector(ntopController, config)
-	prometheus.MustRegister(ntopCollector)
+func serveMetrics(ntopController *ntopng.Controller, myConfig *config.Config) *http.Server {
+	if internal.IsItemInArray(myConfig.Ntopng.ScrapeTargets, config.HostScrape) ||
+		internal.IsItemInArray(myConfig.Ntopng.ScrapeTargets, config.AllScrape) {
+		ntopCollector := ntopPrometheus.NewNtopNGHostCollector(ntopController, myConfig)
+		prometheus.MustRegister(ntopCollector)
+	}
+	if internal.IsItemInArray(myConfig.Ntopng.ScrapeTargets, config.InterfaceScrape) ||
+		internal.IsItemInArray(myConfig.Ntopng.ScrapeTargets, config.AllScrape) {
+		ntopCollector := ntopPrometheus.NewNtopNGInterfaceCollector(ntopController, myConfig)
+		prometheus.MustRegister(ntopCollector)
+	}
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 
 	srv := &http.Server{
-		Addr:    fmt.Sprintf("%s:%d", config.Metric.Serve.IP, config.Metric.Serve.Port),
+		Addr:    fmt.Sprintf("%s:%d", myConfig.Metric.Serve.IP, myConfig.Metric.Serve.Port),
 		Handler: mux,
 	}
 	go func(srv *http.Server) {
