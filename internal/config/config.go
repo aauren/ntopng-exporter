@@ -60,7 +60,7 @@ func ParseConfig() (Config, error) {
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("$HOME/.ntopng-exporter")
 	viper.AddConfigPath("/etc/ntopng-exporter/")
-	viper.AddConfigPath("./Config")
+	viper.AddConfigPath("./config")
 
 	err := viper.ReadInConfig()
 	if err != nil {
