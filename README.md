@@ -14,7 +14,7 @@ Modify the default config in any way that you need, and then copy it to one of t
 * `/etc/ntopng-exporter/ntopng-exporter.yaml`
 * `./config/ntopng-exporter.yaml` (where `./` indicates the working directory that ntopng-exporter is using)
 
-If you configure authentication options for ntopng-exporter, then your config file will contain sensitive information. As such, it is recommended that users change the permissions of the exporter so that it is not widely readable:
+If you configure authentication options for ntopng-exporter, then your config file will contain sensitive information. As such, it is recommended that users change the permissions of the config file so that it is not widely readable:
 
 For Linux this would be done with:
 ```
@@ -29,12 +29,13 @@ Because ntopng's API has shifted quite a bit over the last few versions, this ex
 ## Linux
 If you want to run ntopng-exporter on Linux I recommend copying the [systemd unit file](https://github.com/aauren/ntopng-exporter/blob/main/resources/ntopng-exporter.service) (also included in your download archive in the `/resources` directory) to your local system and having systemd manage it so that it starts when your machine starts.
 
-If you do not run ntopng-exporter on the same host that you run ntopng on, you'll want to modify your exporter and remove: `After=ntopng.service`
+If you do not run ntopng-exporter on the same host that you run ntopng on, you'll want to modify your version of the unit file and remove: `After=ntopng.service`
 
 To run ntopng-exporter as a service do the following:
 ```
-# From your ntopng unpack directory
-sudo cp resources/ntopng-exporter.service /etc/systemd/user
+# From your ntopng-exporter unpack directory
+sudo cp resources/ntopng-exporter.service /etc/systemd/system
+sudo systemctl daemon-reload
 sudo systemctl enable ntopng-exporter
 sudo systemctl start ntopng-exporter
 systemctl status ntopng-exporter
@@ -42,8 +43,10 @@ systemctl status ntopng-exporter
 
 If you run it this way, you'll want to put the configuration file in a system wide path like: `/etc/ntopng-exporter`
 
+Currently the exporter just writes all relevant output, including errors, to stdout. If you have any problems with it starting or it remaining started, be sure to look through the systemd journal for any errors with something like the following: `journalctl -u ntopng-exporter --since="5m ago"`
+
 ### Root Concerns
-If you executed the procedure above, systemd will run ntopng-exporter as root which is absolutely not needed and should be a security concern. It is recommended to create a separate user for ntopng-exporter and change the systemd file appropriately.
+If you executed the procedure above, systemd will run ntopng-exporter as root which is absolutely not needed and may be a security concern. It is recommended to create a separate user for ntopng-exporter and change the systemd file appropriately.
 
 A basic procedure for this would look like the following:
 ```
