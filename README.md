@@ -1,6 +1,9 @@
 # ntopng-exporter
 Is a metric exporter for ntopng which scrapes the API that ntopng exposes and then publishes it as a metric.
 
+This is an example of the types of Grafana dashboards that can be made from these metrics:
+![Grafana Example](/docs/grafana_example.png)
+
 # Installing
 Go to the GitHub [Releases Page](https://github.com/aauren/ntopng-exporter/releases) and download a release for your system. This project publishes binaries for MacOS (darwin), Linux, Windows in x86, amd64, and arm architectures.
 
@@ -70,6 +73,9 @@ curl --cookie "user=admin; password=admin" "http://<ntopng_host>:<ntopng_port>/l
 ```
 
 If that responds, then you should be able to add that endpoint to your .yaml configuration file with confidence.
+
+# Metrics Emitted
+Currently, the only supported metric system is Prometheus, however, the design should be extensible to other metric systems. There are [examples](https://github.com/aauren/ntopng-exporter/blob/main/docs/ntopng_exporter_example_metrics.md) of the Prometheus metrics emitted in the docs section of this repo.
 
 # Releasing
 Releases are generated automatically using [goreleaser](https://goreleaser.com/quick-start/). All that is needed is to [install goreleaser](https://goreleaser.com/install/), [export a repo token from GitHub](https://github.com/settings/tokens/new) (assuming you are releasing to your own fork or that you've been given access to the parent project), and then follow the instructions below:
