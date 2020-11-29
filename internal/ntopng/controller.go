@@ -61,7 +61,7 @@ func (c *Controller) ScrapeAllConfiguredTargets() {
 		internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, config.AllScrape) {
 		c.ScrapeHostEndpointForAllInterfaces()
 	}
-	if internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, config.HostScrape) ||
+	if internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, config.InterfaceScrape) ||
 		internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, config.AllScrape) {
 		c.ScrapeInterfaceEndpointForAllInterfaces()
 	}
@@ -232,7 +232,7 @@ func (c *Controller) scrapeInterfaceEndpoint(interfaceId int, tempInterfaces map
 	var ifFull ntopInterfaceFull
 	err = json.Unmarshal(rawInterface, &ifFull)
 	if err != nil {
-		if ifName, _ := c.ResolveIfID(interfaceId); err != nil {
+		if ifName, err := c.ResolveIfID(interfaceId); err != nil {
 			return fmt.Errorf("problem parsing ntop interface: %s - %v", ifName, err)
 		} else {
 			return fmt.Errorf("problem parsing ntop interface: %d - %v", interfaceId, err)
