@@ -30,6 +30,7 @@ type ntopng struct {
 	AuthMethod     string
 	ScrapeInterval string
 	ScrapeTargets  []string
+	AllowUnsafeTLS bool
 }
 
 type host struct {
@@ -73,6 +74,7 @@ func ParseConfig() (Config, error) {
 	viper.SetDefault("ntopng.metric.serve.ip", "0.0.0.0")
 	viper.SetDefault("ntopng.metric.serve.port", 3001)
 	viper.SetDefault("ntopng.scrapeTargets", "all")
+	viper.SetDefault("ntopng.allowUnsafeTLS", false)
 
 	// Unmarshal config into struct
 	err = viper.Unmarshal(&config)
@@ -138,8 +140,8 @@ func (c Config) String() string {
 }
 
 func (n ntopng) String() string {
-	return fmt.Sprintf("\t%s: '%s'/'%s' - %s\n\tScrape Interval: %s\n\tScrape Targets: %s",
-		n.EndPoint, n.User, n.Password, n.AuthMethod, n.ScrapeInterval, n.ScrapeTargets)
+	return fmt.Sprintf("\t%s: '%s'/'%s' - %s - Allow Unsafe TLS? %t\n\tScrape Interval: %s\n\tScrape Targets: %s",
+		n.EndPoint, n.User, n.Password, n.AuthMethod, n.AllowUnsafeTLS, n.ScrapeInterval, n.ScrapeTargets)
 }
 
 func (h host) String() string {

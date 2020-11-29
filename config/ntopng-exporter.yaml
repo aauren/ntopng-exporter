@@ -1,5 +1,6 @@
 ntopng:
   endpoint: "http://127.0.0.1:3000"
+  allowUnsafeTLS: false # set to true to accept self-signed or otherwise unverifiable certs from ntopng (default: false)
   user: admin
   password: admin
   authMethod: cookie # cookie, basic, or none are accepted values

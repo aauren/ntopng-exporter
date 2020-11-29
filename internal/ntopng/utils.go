@@ -8,9 +8,8 @@ import (
 	"strconv"
 )
 
-func getHttpResponseBody(req *http.Request) (*[]byte, int, error) {
+func getHttpResponseBody(client *http.Client, req *http.Request) (*[]byte, int, error) {
 	var body []byte
-	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return &body, 0, err

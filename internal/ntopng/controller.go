@@ -2,6 +2,7 @@ package ntopng
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"github.com/aauren/ntopng-exporter/internal"
@@ -75,7 +76,7 @@ func (c *Controller) CacheInterfaceIds() error {
 	}
 	c.setCommonOptions(req, false)
 
-	body, status, err := getHttpResponseBody(req)
+	body, status, err := getHttpResponseBody(getHttpClient(c.config.Ntopng.AllowUnsafeTLS), req)
 	if status != http.StatusOK {
 		if body != nil {
 			return fmt.Errorf("request to interface endpoint was not successful. Status: '%d', Response: '%v'",
@@ -135,7 +136,7 @@ func (c *Controller) scrapeHostEndpoint(interfaceId int, tempNtopHosts map[strin
 	}
 	c.setCommonOptions(req, true)
 
-	body, status, err := getHttpResponseBody(req)
+	body, status, err := getHttpResponseBody(getHttpClient(c.config.Ntopng.AllowUnsafeTLS), req)
 	if status != http.StatusOK {
 		if body != nil {
 			return fmt.Errorf("request to host endpoint was not successful. Status: '%d', Response: '%v'",
@@ -214,7 +215,7 @@ func (c *Controller) scrapeInterfaceEndpoint(interfaceId int, tempInterfaces map
 	}
 	c.setCommonOptions(req, false)
 
-	body, status, err := getHttpResponseBody(req)
+	body, status, err := getHttpResponseBody(getHttpClient(c.config.Ntopng.AllowUnsafeTLS), req)
 	if status != http.StatusOK {
 		if body != nil {
 			return fmt.Errorf("request to interface data endpoint was not successful. Status: '%d', Response: '%v'",
@@ -253,4 +254,12 @@ func (c *Controller) setCommonOptions(req *http.Request, isJsonRequest bool) {
 	} else if c.config.Ntopng.AuthMethod == "basic" {
 		req.SetBasicAuth(c.config.Ntopng.User, c.config.Ntopng.Password)
 	}
+}
+
+func getHttpClient(allowInsecure bool) *http.Client {
+	customTransport := http.DefaultTransport.(*http.Transport).Clone()
+	if allowInsecure {
+		customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	}
+	return &http.Client{Transport: customTransport}
 }
