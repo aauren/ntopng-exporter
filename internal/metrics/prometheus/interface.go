@@ -171,18 +171,18 @@ func (c *interfaceCollector) Collect(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(c.speed, prometheus.GaugeValue, myIf.Speed,
 			interfaceLabelValues...)
 		ch <- prometheus.MustNewConstMetric(c.tcpPacketStats, prometheus.CounterValue, myIf.TCPPacketStats.Lost,
-			deepAppend(interfaceLabels, "lost")...)
+			deepAppend(interfaceLabelValues, "lost")...)
 		ch <- prometheus.MustNewConstMetric(c.tcpPacketStats, prometheus.CounterValue, myIf.TCPPacketStats.OutOfOrder,
-			deepAppend(interfaceLabels, "out_of_order")...)
+			deepAppend(interfaceLabelValues, "out_of_order")...)
 		ch <- prometheus.MustNewConstMetric(c.tcpPacketStats, prometheus.CounterValue, myIf.TCPPacketStats.Retransmissions,
-			deepAppend(interfaceLabels, "retransmit")...)
+			deepAppend(interfaceLabelValues, "retransmit")...)
 		ch <- prometheus.MustNewConstMetric(c.throughputBPS, prometheus.GaugeValue, myIf.Throughput.Download.BPS,
-			deepAppend(interfaceLabels, "received")...)
+			deepAppend(interfaceLabelValues, "received")...)
 		ch <- prometheus.MustNewConstMetric(c.throughputBPS, prometheus.GaugeValue, myIf.Throughput.Upload.BPS,
-			deepAppend(interfaceLabels, "sent")...)
+			deepAppend(interfaceLabelValues, "sent")...)
 		ch <- prometheus.MustNewConstMetric(c.throughputPPS, prometheus.GaugeValue, myIf.Throughput.Download.PPS,
-			deepAppend(interfaceLabels, "received")...)
+			deepAppend(interfaceLabelValues, "received")...)
 		ch <- prometheus.MustNewConstMetric(c.throughputPPS, prometheus.GaugeValue, myIf.Throughput.Download.PPS,
-			deepAppend(interfaceLabels, "sent")...)
+			deepAppend(interfaceLabelValues, "sent")...)
 	}
 }
