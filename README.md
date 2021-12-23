@@ -28,6 +28,14 @@ chmod 700 <path_to_config_file>
 # Supported Versions of ntopng
 Because ntopng's API has shifted quite a bit over the last few versions, this exporter is only able to support version 4.2 and above of ntopng. While I have not specifically tested it against 4.0, I believe that it would not work correctly. Additionally, I can verify that it does not work at all against version 3.8.X or below.
 
+In ntopng version 5.X they introduced the v2 REST API and deprecated the v1 REST API. While the v2 API appears to be mostly backwards compatible with the v1 API, it is a different endpoint. After reviewing all of the code changes it became evident that supporting both versions of the API in a single ntopng-exporter version is not a small task. Therefore, I am releasing versions of ntopng-exporter that are compatible with either the v1 API or the v2 API and not both.
+
+For ntopng version 5.X and below, please use ntopng-exporter version `v0.X`
+
+For ntopng version 5.X and above, please use ntopng-exporter version `v1.X`
+
+You'll notice that ntopng version 5.X is compatible with both. For more information please see: https://github.com/ntop/ntopng/releases/tag/5.0
+
 # Running ntopng-exporter
 ## Linux
 If you want to run ntopng-exporter on Linux I recommend copying the [systemd unit file](https://github.com/aauren/ntopng-exporter/blob/main/resources/ntopng-exporter.service) (also included in your download archive in the `/resources` directory) to your local system and having systemd manage it so that it starts when your machine starts.
