@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	luaRestV1Get      = "/lua/rest/v1/get"
+	luaRestV2Get      = "/lua/rest/v2/get"
 	hostCustomFields  = `ip,bytes.sent,bytes.rcvd,active_flows.as_client,active_flows.as_server,dns,num_alerts,mac,total_flows.as_client,total_flows.as_server,vlan,total_alerts,name,ifid,packets.rcvd,packets.sent`
 	hostCustomPath    = "/host/custom_data.lua"
 	interfaceListPath = "/ntopng/interfaces.lua"
@@ -69,7 +69,7 @@ func (c *Controller) ScrapeAllConfiguredTargets() {
 }
 
 func (c *Controller) CacheInterfaceIds() error {
-	endpoint := fmt.Sprintf("%s%s%s", c.config.Ntopng.EndPoint, luaRestV1Get, interfaceListPath)
+	endpoint := fmt.Sprintf("%s%s%s", c.config.Ntopng.EndPoint, luaRestV2Get, interfaceListPath)
 	req, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
 		return err
@@ -128,7 +128,7 @@ func (c *Controller) ScrapeHostEndpointForAllInterfaces() {
 }
 
 func (c *Controller) scrapeHostEndpoint(interfaceId int, tempNtopHosts map[string]ntopHost) error {
-	endpoint := fmt.Sprintf("%s%s%s", c.config.Ntopng.EndPoint, luaRestV1Get, hostCustomPath)
+	endpoint := fmt.Sprintf("%s%s%s", c.config.Ntopng.EndPoint, luaRestV2Get, hostCustomPath)
 	payload := []byte(fmt.Sprintf(`{"ifid": %d, "field_alias": "%s"}`, interfaceId, hostCustomFields))
 	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(payload))
 	if err != nil {
@@ -208,7 +208,7 @@ func (c *Controller) ScrapeInterfaceEndpointForAllInterfaces() {
 
 func (c *Controller) scrapeInterfaceEndpoint(interfaceId int, tempInterfaces map[string]ntopInterfaceFull) error {
 	endpoint := fmt.Sprintf("%s%s%s?ifid=%d",
-		c.config.Ntopng.EndPoint, luaRestV1Get, interfaceDataPath, interfaceId)
+		c.config.Ntopng.EndPoint, luaRestV2Get, interfaceDataPath, interfaceId)
 	req, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
 		return err
