@@ -23,7 +23,7 @@ type ntopHost struct {
 	BytesSent           float64 `json:"bytes.sent"`
 	DNS                 ntopDNS `json:"dns"`
 	IfID                int     `json:"ifid"`
-	IfName              string  `json:ifname`
+	IfName              string  `json:"ifname"`
 	IP                  string  `json:"IP"`
 	MAC                 string  `json:"mac"`
 	Name                string  `json:"name"`
