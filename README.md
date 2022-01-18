@@ -37,7 +37,7 @@ For ntopng version 5.X and above, please use ntopng-exporter version `v1.X`
 You'll notice that ntopng version 5.X is compatible with both. For more information please see: https://github.com/ntop/ntopng/releases/tag/5.0
 
 # Running ntopng-exporter
-## Linux
+## systemd
 If you want to run ntopng-exporter on Linux I recommend copying the [systemd unit file](https://github.com/aauren/ntopng-exporter/blob/main/resources/ntopng-exporter.service) (also included in your download archive in the `/resources` directory) to your local system and having systemd manage it so that it starts when your machine starts.
 
 If you do not run ntopng-exporter on the same host that you run ntopng on, you'll want to modify your version of the unit file and remove: `After=ntopng.service`
@@ -55,6 +55,19 @@ systemctl status ntopng-exporter
 If you run it this way, you'll want to put the configuration file in a system wide path like: `/etc/ntopng-exporter`
 
 Currently the exporter just writes all relevant output, including errors, to stdout. If you have any problems with it starting or it remaining started, be sure to look through the systemd journal for any errors with something like the following: `journalctl -u ntopng-exporter --since="5m ago"`
+
+
+## docker
+Another option is to use docker to deploy the service. You can build the docker image yourself, or use one published on https://hub.docker.com.
+To build the image, make sure that you have at least docker 17.05 installed, and build using the command `docker build .` in the checked out repository.
+
+To run the docker image, a volume containing the `ntopng-exporter.yaml` configuration file named `/config` must be mounted and the port needs to be
+exposed, either with a dynamic port allocation witht the `--publish-all` option or with a specific port mapping with `--publish`. An example
+docker invocation that runs the latest published ntopng-exporter would look something like this:
+
+```sh
+docker run --volume /some/directory/with/config:/config --publish 3001:3001 nresare/ntopng-exporter
+```
 
 ### Root Concerns
 If you executed the procedure above, systemd will run ntopng-exporter as root which is absolutely not needed and may be a security concern. It is recommended to create a separate user for ntopng-exporter and change the systemd file appropriately.
