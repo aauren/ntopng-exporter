@@ -140,8 +140,8 @@ func (c Config) String() string {
 }
 
 func (n ntopng) String() string {
-	return fmt.Sprintf("\t%s: '%s'/'%s' - %s - Allow Unsafe TLS? %t\n\tScrape Interval: %s\n\tScrape Targets: %s",
-		n.EndPoint, n.User, n.Password, n.AuthMethod, n.AllowUnsafeTLS, n.ScrapeInterval, n.ScrapeTargets)
+	return fmt.Sprintf("\t%s: '%s'/*HIDDEN* - %s - Allow Unsafe TLS? %t\n\tScrape Interval: %s\n\tScrape Targets: %s",
+		n.EndPoint, n.User, n.AuthMethod, n.AllowUnsafeTLS, n.ScrapeInterval, n.ScrapeTargets)
 }
 
 func (h host) String() string {
