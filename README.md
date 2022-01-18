@@ -62,7 +62,7 @@ Another option is to use docker to deploy the service. You can build the docker 
 To build the image, make sure that you have at least docker 17.05 installed, and build using the command `docker build .` in the checked out repository.
 
 To run the docker image, a volume containing the `ntopng-exporter.yaml` configuration file named `/config` must be mounted and the port needs to be
-exposed, either with a dynamic port allocation witht the `--publish-all` option or with a specific port mapping with `--publish`. An example
+exposed, either with a dynamic port allocation with the `--publish-all` option or with a specific port mapping with `--publish`. An example
 docker invocation that runs the latest published ntopng-exporter would look something like this:
 
 ```sh
