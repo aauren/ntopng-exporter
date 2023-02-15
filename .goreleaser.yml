@@ -14,11 +14,13 @@ builds:
   - 386
   gobinary: "go1.20.1"
 archives:
-- replacements:
-    darwin: MacOS
-    linux: Linux
-    windows: Windows
-    386: i386
+- id: primary
+  name_template: >-
+    {{ .ProjectName }}_
+    {{- if eq .Os "darwin" }}MacOS
+    {{- else }}{{ title .Os }}{{end}}_
+    {{- if eq .Arch "386" }}i386
+    {{- else }}{{ .Arch }}{{end}}
   format_overrides:
   - goos: windows
     format: zip
@@ -36,5 +38,5 @@ changelog:
   sort: asc
   filters:
     exclude:
-      - '^docs:'
-      - '^test:'
+    - '^docs:'
+    - '^test:'
