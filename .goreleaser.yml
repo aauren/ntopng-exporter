@@ -1,3 +1,14 @@
+---
+release:
+  draft: true
+  prerelease: auto
+  header: |
+    ## Summary
+
+    ## Contributions
+
+    ## Changelog
+
 before:
   hooks:
   - go mod download
