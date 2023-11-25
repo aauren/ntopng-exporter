@@ -7,8 +7,6 @@ release:
 
     ## Contributions
 
-    ## Changelog
-
 before:
   hooks:
   - go mod download
