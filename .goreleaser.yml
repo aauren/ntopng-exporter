@@ -1,3 +1,14 @@
+---
+release:
+  draft: true
+  prerelease: auto
+  header: |
+    ## Summary
+
+    ## Contributions
+
+    ## Changelog
+
 before:
   hooks:
   - go mod download
@@ -10,9 +21,15 @@ builds:
   - darwin
   goarch:
   - arm64
+  - arm
   - amd64
   - 386
-  gobinary: "go1.21.3"
+  - s390x
+  - ppc64le
+  - riscv64
+  goarm:
+  - 6
+  - 7
 archives:
 - id: primary
   name_template: >-
@@ -21,6 +38,7 @@ archives:
     {{- else }}{{ title .Os }}{{end}}_
     {{- if eq .Arch "386" }}i386
     {{- else }}{{ .Arch }}{{end}}
+    {{ with .Arm }}v{{ . }}{{ end }}
   format_overrides:
   - goos: windows
     format: zip
