@@ -1,0 +1,119 @@
+name: continuous-integration
+
+on:
+  push:
+    branches:
+    - main
+    - v[1-9].*
+    - prep-v[1-9].*
+    tags:
+    - v[1-9].*
+  pull_request:
+    branches:
+    - main
+    - v[1-9].*
+    - prep-v[1-9].*
+
+env:
+  BUILDTIME_BASE: "golang:1.21.4"
+  RUNTIME_BASE: "gcr.io/distroless/static"
+  GO_VERSION: "~1.21.4"
+  GO_CACHE: "/home/runner/.cache/go-build"
+  GO_MOD_CACHE: "/home/runner/go/pkg/mod"
+
+jobs:
+  # Builds ntopng-exporter binary
+  ci-build-ntopng-exporter:
+    name: ci-build-ntopng-exporter
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v4
+
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+      id: go
+
+    - name: Install dependencies
+      run: |
+        go get .
+
+    - name: Build
+      run: go build -v -ldflags '-s -w' ./...
+      env:
+        CGO_ENABLED: "0"
+
+  # Builds Container only if a tag or a pull request from a source branch within the repository
+  ci-build-container:
+    runs-on: ubuntu-latest
+    if: >-
+      ${{
+        github.event_name != 'pull_request' ||
+        (
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.actor != 'dependabot[bot]' &&
+          startsWith(github.ref, 'refs/tags/v'))
+      }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Extract metadata (tags, labels) for Docker (RC, Tag)
+      id: meta
+      uses: docker/metadata-action@v4
+      with:
+        images: aauren/ntopng-exporter
+
+    # Tagging a proper release, update latest
+    - name: Build and push - New Tag
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        platforms: |
+          linux/amd64
+          linux/arm64
+          linux/arm/v7
+          linux/s390x
+          linux/ppc64le
+        push: true
+        build-args: |
+          BUILDTIME_BASE=${{ env.BUILDTIME_BASE }}
+          RUNTIME_BASE=${{ env.RUNTIME_BASE }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+
+  # Runs Go Releaser on Tag Event
+  ci-goreleaser-tag:
+    runs-on: ubuntu-latest
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    steps:
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v4
+
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+      id: go
+
+    - name: Run GoReleaser
+      uses: goreleaser/goreleaser-action@v4
+      with:
+        version: latest
+        args: release --clean
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
