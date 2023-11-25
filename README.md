@@ -66,7 +66,7 @@ exposed, either with a dynamic port allocation with the `--publish-all` option o
 docker invocation that runs the latest published ntopng-exporter would look something like this:
 
 ```sh
-docker run --volume /some/directory/with/config:/config --publish 3001:3001 nresare/ntopng-exporter
+docker run --volume /some/directory/with/config:/config --publish 3001:3001 aauren/ntopng-exporter
 ```
 
 ### Root Concerns
