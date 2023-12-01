@@ -96,11 +96,10 @@ curl --cookie "user=admin; password=admin" "http://<ntopng_host>:<ntopng_port>/l
 If that responds, then you should be able to add that endpoint to your .yaml configuration file with confidence.
 
 # Metrics Emitted
-Currently, the only supported metric system is Prometheus, however, the design should be extensible to other metric systems. There are [examples](https://github.com/aauren/ntopng-exporter/blob/main/docs/ntopng_exporter_example_metrics.md) of the Prometheus metrics emitted in the docs section of this repo.
+Currently, the only supported metric system is Prometheus, however, the design should be extensible to other metric systems. There are [examples](/docs/ntopng_exporter_example_metrics.md) of the Prometheus metrics emitted in the docs section of this repo.
 
-# Releasing
-Releases are generated automatically using [goreleaser](https://goreleaser.com/quick-start/). All that is needed is to [install goreleaser](https://goreleaser.com/install/), [export a repo token from GitHub](https://github.com/settings/tokens/new) (assuming you are releasing to your own fork or that you've been given access to the parent project), and then follow the instructions below:
-* Export GitHub Token: `export GITHUB_TOKEN="YOUR_GH_TOKEN"`
-* Tag a New Release: `git tag -a v0.1.0 -m "Initial Release"`
-* Push Release: `git push origin v0.1.0`
-* Run goreleaser: `goreleaser release --rm-dist`
+# Grafana Dashboard
+
+There is an example Grafana dashboard that user's can use contained within this repository at [grafana-dashboard.json](/docs/grafana-dashboard.json)
+
+You can also find an example of the dashboard on Grafana's public dashboard service [ntopng-exporter](https://grafana.com/grafana/dashboards/20071)
