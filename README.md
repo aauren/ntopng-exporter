@@ -145,6 +145,6 @@ section of this repo.
 
 # Grafana Dashboard
 
-There is an example Grafana dashboard that user's can use contained within this repository at [grafana-dashboard.json](/docs/grafana-dashboard.json)
+There is an example Grafana dashboard that user's can use contained within this repository at [grafana-dashboard.json](/resources/grafana-dashboard.json)
 
 You can also find an example of the dashboard on Grafana's public dashboard service [ntopng-exporter](https://grafana.com/grafana/dashboards/20071)
