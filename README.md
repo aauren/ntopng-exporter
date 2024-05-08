@@ -5,6 +5,17 @@ A metric exporter for ntopng which scrapes the API that ntopng exposes and then 
 This is an example of the types of Grafana dashboards that can be made from these metrics:
 ![Grafana Example](/docs/grafana_example.png)
 
+## Current State (as of May of 2024)
+
+At this point, I consider ntopng-exporter more or less feature complete. I am continuing to use it personally, and will
+continue to update it's dependencies, go versions, etc. on a quarterly basis or so. If there is anything that you find
+is broken feel free to open an issue and I'll take a look at it when I get a chance. However, in terms of features, I'm
+pretty limited based upon what is available to me from the ntopng API upstream. Unless they change it significantly, it
+is unlikely that many features that most people might want are available.
+
+However, if you do find something that is available via the API that I have so far not included here, PR's are always
+welcome!
+
 ## Installing
 
 Go to the GitHub [Releases Page](https://github.com/aauren/ntopng-exporter/releases) and download a release for your
@@ -13,7 +24,7 @@ system. This project publishes binaries for MacOS (darwin), Linux, Windows in x8
 ## Configuring
 
 ntopng-exporter tries to setup a few sensible defaults for you, but there are some things that it needs to know in order
-to run correctly. Specifically, it needs to know the IP and Port of your ntopng setup, what interfaces you want to 
+to run correctly. Specifically, it needs to know the IP and Port of your ntopng setup, what interfaces you want to
 monitor on the ntopng machine, and the username/password for ntopng (if you have one set).
 
 By default, your release archive will come with a [sample config file](https://github.com/aauren/ntopng-exporter/blob/main/config/ntopng-exporter.yaml)
@@ -83,7 +94,6 @@ Currently the exporter just writes all relevant output, including errors, to std
 starting or it remaining started, be sure to look through the systemd journal for any errors with something like the
 following: `journalctl -u ntopng-exporter --since="5m ago"`
 
-
 #### Root Concerns
 
 If you executed the procedure above, systemd will run ntopng-exporter as root which is absolutely not needed and may
@@ -143,7 +153,7 @@ Currently, the only supported metric system is Prometheus, however, the design s
 systems. There are [examples](/docs/ntopng_exporter_example_metrics.md) of the Prometheus metrics emitted in the docs
 section of this repo.
 
-# Grafana Dashboard
+## Grafana Dashboard
 
 There is an example Grafana dashboard that user's can use contained within this repository at [grafana-dashboard.json](/resources/grafana-dashboard.json)
 
