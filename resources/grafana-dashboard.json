@@ -15,19 +15,31 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "10.2.1"
+      "version": "10.4.2"
     },
     {
       "type": "panel",
-      "id": "grafana-piechart-panel",
-      "name": "Pie Chart (old)",
-      "version": "1.6.2"
+      "id": "piechart",
+      "name": "Pie chart",
+      "version": ""
     },
     {
       "type": "datasource",
       "id": "prometheus",
       "name": "Prometheus",
       "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
     }
   ],
   "annotations": {
@@ -87,7 +99,7 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4.8,
+        "w": 8,
         "x": 0,
         "y": 0
       },
@@ -105,10 +117,11 @@
           "fields": "",
           "values": false
         },
+        "showPercentChange": false,
         "textMode": "value",
         "wideLayout": true
       },
-      "pluginVersion": "10.2.1",
+      "pluginVersion": "10.4.2",
       "repeat": "interface",
       "repeatDirection": "h",
       "targets": [
@@ -119,7 +132,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "ntopng_interface_num_devices{ifname=~\"$interface\"}",
+          "expr": "ntopng_interface_num_devices{instance=~\"$instance\",ifname=~\"$interface\"}",
           "instant": true,
           "interval": "",
           "legendFormat": "{{ifname}}",
@@ -161,7 +174,7 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4.8,
+        "w": 8,
         "x": 0,
         "y": 4
       },
@@ -179,11 +192,12 @@
           "fields": "",
           "values": false
         },
+        "showPercentChange": false,
         "text": {},
         "textMode": "value",
         "wideLayout": true
       },
-      "pluginVersion": "10.2.1",
+      "pluginVersion": "10.4.2",
       "repeat": "interface",
       "repeatDirection": "h",
       "targets": [
@@ -194,7 +208,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "ntopng_interface_alerted_error_flows{ifname=~\"$interface\"}",
+          "expr": "ntopng_interface_alerted_error_flows{instance=~\"$instance\",ifname=~\"$interface\"}",
           "instant": true,
           "interval": "",
           "legendFormat": "{{ifname}}",
@@ -326,7 +340,6 @@
         "y": 8
       },
       "id": 40,
-      "links": [],
       "options": {
         "legend": {
           "calcs": [],
@@ -347,7 +360,7 @@
             "uid": "${PROM}"
           },
           "editorMode": "code",
-          "expr": "rate(ntopng_interface_bytes_sent{ifname=~\"$interface\"}[$__rate_interval])*8",
+          "expr": "rate(ntopng_interface_bytes_sent{instance=~\"$instance\",ifname=~\"$interface\"}[$__rate_interval])*8",
           "format": "time_series",
           "interval": "1m",
           "intervalFactor": 1,
@@ -361,7 +374,7 @@
             "uid": "${PROM}"
           },
           "editorMode": "code",
-          "expr": "rate(ntopng_interface_bytes_rcvd{ifname=~\"$interface\"}[$__rate_interval])*8",
+          "expr": "rate(ntopng_interface_bytes_rcvd{instance=~\"$instance\",ifname=~\"$interface\"}[$__rate_interval])*8",
           "format": "time_series",
           "interval": "1m",
           "intervalFactor": 1,
@@ -496,7 +509,6 @@
       },
       "id": 22,
       "interval": "",
-      "links": [],
       "options": {
         "legend": {
           "calcs": [],
@@ -512,27 +524,31 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(irate(ntopng_host_bytes_rcvd{ifname=~'$interface',vlan=~'$vlan'}[1m])*8) by (vlan)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${PROM}"
+          },
+          "editorMode": "code",
+          "expr": "sum(irate(ntopng_host_bytes_rcvd{instance=~\"$instance\",ifname=~'$interface',vlan=~'$vlan'}[1m])*8) by (vlan)",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
           "legendFormat": "Ingress - {{ vlan }}",
-          "refId": "A",
+          "range": true,
+          "refId": "A"
+        },
+        {
           "datasource": {
             "type": "prometheus",
             "uid": "${PROM}"
-          }
-        },
-        {
-          "expr": "sum(irate(ntopng_host_bytes_sent{ifname=~'$interface',vlan=~'$vlan'}[1m])*8) by (vlan)",
+          },
+          "editorMode": "code",
+          "expr": "sum(irate(ntopng_host_bytes_sent{instance=~\"$instance\",ifname=~'$interface',vlan=~'$vlan'}[1m])*8) by (vlan)",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "Egress - {{ vlan }}",
-          "refId": "B",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${PROM}"
-          }
+          "range": true,
+          "refId": "B"
         }
       ],
       "title": "Traffic by VLAN",
@@ -660,7 +676,6 @@
       },
       "id": 21,
       "interval": "",
-      "links": [],
       "options": {
         "legend": {
           "calcs": [],
@@ -681,7 +696,7 @@
             "uid": "${PROM}"
           },
           "editorMode": "code",
-          "expr": "topk(5, irate(ntopng_host_bytes_rcvd{ifname=~'$interface',vlan=~'$vlan'}[1m])*8 > 0)",
+          "expr": "topk(5, irate(ntopng_host_bytes_rcvd{instance=~\"$instance\",ifname=~'$interface',vlan=~'$vlan'}[1m])*8 > 0)",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{ name }}({{ ip }} rec)",
@@ -694,7 +709,7 @@
             "uid": "${PROM}"
           },
           "editorMode": "code",
-          "expr": "topk(5, irate(ntopng_host_bytes_sent{ifname=~'$interface',vlan=~'$vlan'}[1m])*8 > 0)",
+          "expr": "topk(5, irate(ntopng_host_bytes_sent{instance=~\"$instance\",ifname=~'$interface',vlan=~'$vlan'}[1m])*8 > 0)",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{ name }}({{ ip }} snt)",
@@ -816,7 +831,6 @@
       },
       "id": 14,
       "interval": "",
-      "links": [],
       "options": {
         "legend": {
           "calcs": [],
@@ -837,24 +851,13 @@
             "uid": "${PROM}"
           },
           "editorMode": "code",
-          "expr": "topk(5, irate(ntopng_host_bytes_rcvd{ifname=~'$interface',vlan=~'$vlan'}[1m])*8 > 0)",
+          "expr": "topk(5, irate(ntopng_host_bytes_rcvd{instance=~\"$instance\",ifname=~'$interface',vlan=~'$vlan'}[1m])*8 > 0)",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
           "legendFormat": "{{ name }}({{ ip }})",
           "range": true,
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${PROM}"
-          },
-          "expr": "",
-          "format": "time_series",
-          "intervalFactor": 2,
-          "legendFormat": "",
-          "refId": "B"
         }
       ],
       "title": "Inbound Traffic by IP",
@@ -969,7 +972,6 @@
         "y": 36
       },
       "id": 12,
-      "links": [],
       "options": {
         "legend": {
           "calcs": [],
@@ -990,24 +992,13 @@
             "uid": "${PROM}"
           },
           "editorMode": "code",
-          "expr": "topk(5, irate(ntopng_host_bytes_sent{ifname=~'$interface',vlan=~'$vlan'}[1m])*8 > 0)",
+          "expr": "topk(5, irate(ntopng_host_bytes_sent{instance=~\"$instance\",ifname=~'$interface',vlan=~'$vlan'}[1m])*8 > 0)",
           "format": "time_series",
           "instant": false,
           "interval": "",
           "intervalFactor": 1,
           "legendFormat": "{{ name }}({{ ip }})",
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${PROM}"
-          },
-          "expr": "",
-          "format": "time_series",
-          "intervalFactor": 2,
-          "legendFormat": "",
-          "refId": "B"
         }
       ],
       "title": "Outbound Traffic by IP",
@@ -1099,7 +1090,7 @@
             "uid": "${PROM}"
           },
           "editorMode": "code",
-          "expr": "topk(10, increase(ntopng_host_total_client_flows{ifname=~\"$interface\",vlan=~\"$vlan\"}[5m]))",
+          "expr": "topk(10, increase(ntopng_host_total_client_flows{instance=~\"$instance\",ifname=~\"$interface\",vlan=~\"$vlan\"}[5m]))",
           "interval": "",
           "legendFormat": "{{name}} - {{ip}}",
           "range": true,
@@ -1127,18 +1118,28 @@
       "type": "row"
     },
     {
-      "aliasColors": {},
-      "breakPoint": "25%",
-      "combine": {
-        "label": "Others",
-        "threshold": 0
-      },
       "datasource": {
         "type": "prometheus",
         "uid": "${PROM}"
       },
-      "fontSize": "80%",
-      "format": "bytes",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
       "gridPos": {
         "h": 11,
         "w": 8,
@@ -1146,21 +1147,31 @@
         "y": 49
       },
       "id": 4,
-      "legend": {
-        "header": "",
-        "percentage": true,
-        "show": true,
-        "sideWidth": 300,
-        "sort": "total",
-        "sortDesc": true,
-        "values": true
-      },
-      "legendType": "Under graph",
-      "links": [],
       "maxDataPoints": 3,
-      "nullPointMode": "connected",
-      "pieType": "pie",
-      "strokeWidth": 1,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
       "targets": [
         {
           "datasource": {
@@ -1168,7 +1179,7 @@
             "uid": "${PROM}"
           },
           "editorMode": "code",
-          "expr": "topk(10, sum(increase(ntopng_host_bytes_rcvd{ifname=~'$interface',vlan=~'$vlan'}[15m])) by (ip, name) + sum(increase(ntopng_host_bytes_sent{ifname=~'$interface',vlan=~'$vlan'}[15m])) by (ip, name))",
+          "expr": "topk(10, sum(increase(ntopng_host_bytes_rcvd{instance=~\"$instance\",ifname=~'$interface',vlan=~'$vlan'}[15m])) by (ip, name) + sum(increase(ntopng_host_bytes_sent{instance=~\"$instance\",ifname=~'$interface',vlan=~'$vlan'}[15m])) by (ip, name))",
           "format": "time_series",
           "instant": true,
           "intervalFactor": 1,
@@ -1178,22 +1189,31 @@
       ],
       "timeFrom": "15m",
       "title": "Top Talkers (Last 15 Minutes)",
-      "type": "grafana-piechart-panel",
-      "valueName": "total"
+      "type": "piechart"
     },
     {
-      "aliasColors": {},
-      "breakPoint": "25%",
-      "combine": {
-        "label": "Others",
-        "threshold": 0
-      },
       "datasource": {
         "type": "prometheus",
         "uid": "${PROM}"
       },
-      "fontSize": "80%",
-      "format": "bytes",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
       "gridPos": {
         "h": 11,
         "w": 8,
@@ -1202,20 +1222,31 @@
       },
       "hideTimeOverride": false,
       "id": 6,
-      "legend": {
-        "percentage": true,
-        "show": true,
-        "sideWidth": 300,
-        "sort": "total",
-        "sortDesc": true,
-        "values": true
-      },
-      "legendType": "Under graph",
-      "links": [],
       "maxDataPoints": 3,
-      "nullPointMode": "connected",
-      "pieType": "pie",
-      "strokeWidth": 1,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
       "targets": [
         {
           "datasource": {
@@ -1223,7 +1254,7 @@
             "uid": "${PROM}"
           },
           "editorMode": "code",
-          "expr": "topk(10, sum(increase(ntopng_host_bytes_rcvd{ifname=~'$interface',vlan=~'$vlan'}[3h])) by (ip, name) + sum(increase(ntopng_host_bytes_sent{ifname=~'$interface',vlan=~'$vlan'}[3h])) by (ip, name))",
+          "expr": "topk(10, sum(increase(ntopng_host_bytes_rcvd{instance=~\"$instance\",ifname=~'$interface',vlan=~'$vlan'}[3h])) by (ip, name) + sum(increase(ntopng_host_bytes_sent{instance=~\"$instance\",ifname=~'$interface',vlan=~'$vlan'}[3h])) by (ip, name))",
           "format": "time_series",
           "instant": true,
           "interval": "",
@@ -1233,22 +1264,31 @@
         }
       ],
       "title": "Top Talkers (Last 3 Hours)",
-      "type": "grafana-piechart-panel",
-      "valueName": "total"
+      "type": "piechart"
     },
     {
-      "aliasColors": {},
-      "breakPoint": "25%",
-      "combine": {
-        "label": "Others",
-        "threshold": 0
-      },
       "datasource": {
         "type": "prometheus",
         "uid": "${PROM}"
       },
-      "fontSize": "80%",
-      "format": "bytes",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
       "gridPos": {
         "h": 11,
         "w": 8,
@@ -1256,19 +1296,31 @@
         "y": 49
       },
       "id": 8,
-      "legend": {
-        "percentage": true,
-        "show": true,
-        "sort": "total",
-        "sortDesc": true,
-        "values": true
-      },
-      "legendType": "Under graph",
-      "links": [],
       "maxDataPoints": 3,
-      "nullPointMode": "connected",
-      "pieType": "pie",
-      "strokeWidth": 1,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
       "targets": [
         {
           "datasource": {
@@ -1276,7 +1328,7 @@
             "uid": "${PROM}"
           },
           "editorMode": "code",
-          "expr": "topk(10, sum(increase(ntopng_host_bytes_rcvd{ifname=~'$interface',vlan=~'$vlan'}[1d])) by (ip, name) + sum(increase(ntopng_host_bytes_sent{ifname=~'$interface',vlan=~'$vlan'}[1d])) by (ip, name))",
+          "expr": "topk(10, sum(increase(ntopng_host_bytes_rcvd{instance=~\"$instance\",ifname=~'$interface',vlan=~'$vlan'}[1d])) by (ip, name) + sum(increase(ntopng_host_bytes_sent{instance=~\"$instance\",ifname=~'$interface',vlan=~'$vlan'}[1d])) by (ip, name))",
           "format": "time_series",
           "instant": true,
           "interval": "",
@@ -1287,8 +1339,7 @@
       ],
       "timeFrom": "1d",
       "title": "Top Talkers (Last 24 Hours)",
-      "type": "grafana-piechart-panel",
-      "valueName": "total"
+      "type": "piechart"
     },
     {
       "datasource": {
@@ -1372,7 +1423,7 @@
             "uid": "${PROM}"
           },
           "editorMode": "code",
-          "expr": "sum(increase(ntopng_interface_tcp_packet_stats{ifname=~\"$interface\"}[5m])) by (ifname,type)",
+          "expr": "sum(increase(ntopng_interface_tcp_packet_stats{instance=~\"$instance\",ifname=~\"$interface\"}[5m])) by (ifname,type)",
           "interval": "",
           "legendFormat": "{{ifname}} - {{type}}",
           "range": true,
@@ -1384,7 +1435,7 @@
     }
   ],
   "refresh": "",
-  "schemaVersion": 38,
+  "schemaVersion": 39,
   "tags": [
     "ntopng",
     "network",
@@ -1398,7 +1449,32 @@
           "type": "prometheus",
           "uid": "${PROM}"
         },
-        "definition": "label_values(ntopng_interface_bytes_rcvd, ifname)",
+        "definition": "label_values(ntopng_interface_num_hosts,instance)",
+        "description": "Filter by instance",
+        "hide": 0,
+        "includeAll": true,
+        "label": "instance",
+        "multi": true,
+        "name": "instance",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(ntopng_interface_num_hosts,instance)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${PROM}"
+        },
+        "definition": "label_values(ntopng_interface_bytes_rcvd{instance=~\"$instance\"},ifname)",
         "hide": 0,
         "includeAll": true,
         "label": "Interface:",
@@ -1406,11 +1482,12 @@
         "name": "interface",
         "options": [],
         "query": {
-          "query": "label_values(ntopng_interface_bytes_rcvd, ifname)",
-          "refId": "prometheus-interface-Variable-Query"
+          "qryType": 1,
+          "query": "label_values(ntopng_interface_bytes_rcvd{instance=~\"$instance\"},ifname)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
-        "regex": "/netint.*/",
+        "regex": "",
         "skipUrlSync": false,
         "sort": 1,
         "tagValuesQuery": "",
@@ -1424,7 +1501,7 @@
           "type": "prometheus",
           "uid": "${PROM}"
         },
-        "definition": "label_values(ntopng_host_bytes_rcvd, vlan)",
+        "definition": "label_values(ntopng_host_bytes_rcvd{instance=~\"$instance\"},vlan)",
         "hide": 0,
         "includeAll": true,
         "label": "VLAN:",
@@ -1432,8 +1509,9 @@
         "name": "vlan",
         "options": [],
         "query": {
-          "query": "label_values(ntopng_host_bytes_rcvd, vlan)",
-          "refId": "prometheus-vlan-Variable-Query"
+          "qryType": 1,
+          "query": "label_values(ntopng_host_bytes_rcvd{instance=~\"$instance\"},vlan)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",
@@ -1478,6 +1556,6 @@
   "timezone": "",
   "title": "ntopng-exporter",
   "uid": "ac4c685b-1023-4a52-898e-6b12fa4406c0",
-  "version": 1,
+  "version": 4,
   "weekStart": ""
 }
