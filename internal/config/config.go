@@ -27,6 +27,7 @@ type ntopng struct {
 	EndPoint       string
 	User           string
 	Password       string
+	Token	       string
 	AuthMethod     string
 	ScrapeInterval string
 	ScrapeTargets  []string
@@ -86,7 +87,7 @@ func ParseConfig() (Config, error) {
 }
 
 func (c *Config) validate() error {
-	if c.Ntopng.AuthMethod != "cookie" && c.Ntopng.AuthMethod != "basic" && c.Ntopng.AuthMethod != "none" {
+	if c.Ntopng.AuthMethod != "cookie" && c.Ntopng.AuthMethod != "basic" && c.Ntopng.AuthMethod != "token" && c.Ntopng.AuthMethod != "none" {
 		return fmt.Errorf("ntopng authMethod must be either cookie, basic, or none")
 	}
 	if c.Host.InterfacesToMonitor == nil || len(c.Host.InterfacesToMonitor) < 1 {
