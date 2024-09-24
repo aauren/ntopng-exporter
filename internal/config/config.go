@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/spf13/viper"
 	"net"
+	"os"
 	"strings"
 	"time"
 )
@@ -82,6 +83,10 @@ func ParseConfig() (Config, error) {
 	if err != nil {
 		return config, err
 	}
+    	// Check if environment variable NTOPNG_TOKEN is set
+    	if tokenEnv, exists := os.LookupEnv("NTOPNG_TOKEN"); exists {
+        	config.Ntopng.Token = tokenEnv
+    	}	
 	err = config.validate()
 	return config, err
 }
