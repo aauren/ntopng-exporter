@@ -253,6 +253,8 @@ func (c *Controller) setCommonOptions(req *http.Request, isJsonRequest bool) {
 				c.config.Ntopng.User, c.config.Ntopng.Password))
 	} else if c.config.Ntopng.AuthMethod == "basic" {
 		req.SetBasicAuth(c.config.Ntopng.User, c.config.Ntopng.Password)
+	} else if c.config.Ntopng.AuthMethod == "token" {
+		req.Header.Add("Authorization", fmt.Sprintf("Token %s", c.config.Ntopng.Token))
 	}
 }
 
