@@ -73,7 +73,7 @@ jobs:
 
     # Tagging a proper release, update latest
     - name: Build and push - New Tag
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         context: .
         platforms: |
