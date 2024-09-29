@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/spf13/viper"
 	"net"
+	"os"
 	"strings"
 	"time"
 )
@@ -27,6 +28,7 @@ type ntopng struct {
 	EndPoint       string
 	User           string
 	Password       string
+	Token	       string
 	AuthMethod     string
 	ScrapeInterval string
 	ScrapeTargets  []string
@@ -81,13 +83,27 @@ func ParseConfig() (Config, error) {
 	if err != nil {
 		return config, err
 	}
+    	// Check if environment variable NTOPNG_TOKEN is set
+    	if tokenEnv, exists := os.LookupEnv("NTOPNG_TOKEN"); exists {
+        	config.Ntopng.Token = tokenEnv
+    	}	
 	err = config.validate()
 	return config, err
 }
 
 func (c *Config) validate() error {
-	if c.Ntopng.AuthMethod != "cookie" && c.Ntopng.AuthMethod != "basic" && c.Ntopng.AuthMethod != "none" {
-		return fmt.Errorf("ntopng authMethod must be either cookie, basic, or none")
+	if c.Ntopng.AuthMethod != "cookie" && c.Ntopng.AuthMethod != "basic" && c.Ntopng.AuthMethod != "token" && c.Ntopng.AuthMethod != "none" {
+		return fmt.Errorf("ntopng authMethod must be either cookie, basic, token or none")
+	}
+	if c.Ntopng.AuthMethod == "cookie" || c.Ntopng.AuthMethod == "basic" {
+		if c.Ntopng.User == "" || c.Ntopng.Password == "" {
+			return fmt.Errorf("ntopng user and password must be set when using cookie or basic auth")
+		}
+	}
+	if c.Ntopng.AuthMethod == "token" {
+		if c.Ntopng.Token == "" {
+			return fmt.Errorf("ntopng token must be set when using token auth")
+		}
 	}
 	if c.Host.InterfacesToMonitor == nil || len(c.Host.InterfacesToMonitor) < 1 {
 		return fmt.Errorf("must specify at least one interface to monitor")
