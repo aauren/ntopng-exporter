@@ -97,7 +97,7 @@ func (c *Config) validate() error {
 	}
 	if c.Ntopng.AuthMethod == "cookie" || c.Ntopng.AuthMethod == "basic" {
 		if c.Ntopng.User == "" || c.Ntopng.Password == "" {
-			return fmt.Errorf("ntopng user and password must be set when using cookie auth")
+			return fmt.Errorf("ntopng user and password must be set when using cookie or basic auth")
 		}
 	}
 	if c.Ntopng.AuthMethod == "token" {
