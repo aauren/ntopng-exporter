@@ -3,7 +3,7 @@ ntopng:
   allowUnsafeTLS: false # set to true to accept self-signed or otherwise unverifiable certs from ntopng (default: false)
   user: admin
   password: admin
-  authMethod: cookie # cookie, basic, or none are accepted values
+  authMethod: cookie # cookie, basic, toekn or none are accepted values
   scrapeInterval: 15s # scrape from the ntopng API every x period of time (should be synced with your prometheus scrapes) (default: 1 minute)
   scrapeTargets: # you can also specify "all" as a single list item to scrape all available endpoints (default: all)
   - hosts
