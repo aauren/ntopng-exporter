@@ -1,4 +1,5 @@
 ---
+version: 2
 release:
   draft: true
   prerelease: auto
@@ -39,7 +40,8 @@ archives:
     {{ with .Arm }}v{{ . }}{{ end }}
   format_overrides:
   - goos: windows
-    format: zip
+    formats:
+      - zip
   files:
   - config/*
   - resources/ntopng-exporter.service
@@ -49,7 +51,7 @@ archives:
 checksum:
   name_template: 'checksums.txt'
 snapshot:
-  name_template: "{{ .Tag }}-next"
+  version_template: "{{ .Tag }}-next"
 changelog:
   sort: asc
   filters:
