@@ -123,3 +123,6 @@ fabric.properties
 
 # Ignore .act directory
 .act
+
+# Ignore built binaries
+ntopng-exporter
