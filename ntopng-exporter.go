@@ -41,7 +41,7 @@ func main() {
 
 	// Setup goroutine for serving traffic
 	srv := serveMetrics(&ntopControl, &myConfig)
-	c := make(chan os.Signal)
+	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 
@@ -73,8 +73,9 @@ func serveMetrics(ntopController *ntopng.Controller, myConfig *config.Config) *h
 	mux.Handle("/metrics", promhttp.Handler())
 
 	srv := &http.Server{
-		Addr:    fmt.Sprintf("%s:%d", myConfig.Metric.Serve.IP, myConfig.Metric.Serve.Port),
-		Handler: mux,
+		Addr:              fmt.Sprintf("%s:%d", myConfig.Metric.Serve.IP, myConfig.Metric.Serve.Port),
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 	go func(srv *http.Server) {
 		if msg := srv.ListenAndServe(); msg != nil {

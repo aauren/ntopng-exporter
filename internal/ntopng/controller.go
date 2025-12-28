@@ -2,6 +2,7 @@ package ntopng
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -16,8 +17,10 @@ import (
 )
 
 const (
-	luaRestV2Get      = "/lua/rest/v2/get"
-	hostCustomFields  = `ip,bytes.sent,bytes.rcvd,active_flows.as_client,active_flows.as_server,dns,num_alerts,mac,total_flows.as_client,total_flows.as_server,vlan,total_alerts,name,ifid,packets.rcvd,packets.sent`
+	luaRestV2Get     = "/lua/rest/v2/get"
+	hostCustomFields = `ip,bytes.sent,bytes.rcvd,active_flows.as_client,active_flows.as_server,dns,` +
+		`num_alerts,mac,total_flows.as_client,total_flows.as_server,vlan,total_alerts,name,ifid,` +
+		`packets.rcvd,packets.sent`
 	hostCustomPath    = "/host/custom_data.lua"
 	interfaceListPath = "/ntopng/interfaces.lua"
 	interfaceDataPath = "/interface/data.lua"
@@ -71,7 +74,7 @@ func (c *Controller) ScrapeAllConfiguredTargets() {
 
 func (c *Controller) CacheInterfaceIds() error {
 	endpoint := fmt.Sprintf("%s%s%s", c.config.Ntopng.EndPoint, luaRestV2Get, interfaceListPath)
-	req, err := http.NewRequest("GET", endpoint, nil)
+	req, err := http.NewRequestWithContext(context.Background(), "GET", endpoint, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get response from ntopng interface endpoint: %v", err)
 	}
@@ -132,13 +135,13 @@ func (c *Controller) ScrapeHostEndpointForAllInterfaces() {
 func (c *Controller) scrapeHostEndpoint(interfaceId int, tempNtopHosts map[string]ntopHost) error {
 	endpoint := fmt.Sprintf("%s%s%s", c.config.Ntopng.EndPoint, luaRestV2Get, hostCustomPath)
 	payload := []byte(fmt.Sprintf(`{"ifid": %d, "field_alias": "%s"}`, interfaceId, hostCustomFields))
-	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(payload))
+	req, err := http.NewRequestWithContext(context.Background(), "POST", endpoint, bytes.NewBuffer(payload))
 	if err != nil {
 		return err
 	}
 	c.setCommonOptions(req, true)
 
-	body, status, err := getHttpResponseBody(getHttpClient(c.config.Ntopng.AllowUnsafeTLS), req)
+	body, status, _ := getHttpResponseBody(getHttpClient(c.config.Ntopng.AllowUnsafeTLS), req)
 	if status != http.StatusOK {
 		if body != nil {
 			return fmt.Errorf("request to host endpoint was not successful. Status: '%d', Response: '%v'",
@@ -154,12 +157,12 @@ func (c *Controller) scrapeHostEndpoint(interfaceId int, tempNtopHosts map[strin
 		return err
 	}
 	var hostList []ntopHost
-	err = json.Unmarshal(rawHosts, &hostList)
+	_ = json.Unmarshal(rawHosts, &hostList)
 	if len(hostList) < 1 {
 		return fmt.Errorf("ntopng returned 0 hosts: %v", *body)
 	}
 	var parsedSubnets []*net.IPNet
-	if c.config.Metric.LocalSubnetsOnly != nil && len(c.config.Metric.LocalSubnetsOnly) > 0 {
+	if len(c.config.Metric.LocalSubnetsOnly) > 0 {
 		for _, subnet := range c.config.Metric.LocalSubnetsOnly {
 			_, parsedSubnet, _ := net.ParseCIDR(subnet)
 			parsedSubnets = append(parsedSubnets, parsedSubnet)
@@ -211,13 +214,13 @@ func (c *Controller) ScrapeInterfaceEndpointForAllInterfaces() {
 func (c *Controller) scrapeInterfaceEndpoint(interfaceId int, tempInterfaces map[string]ntopInterfaceFull) error {
 	endpoint := fmt.Sprintf("%s%s%s?ifid=%d",
 		c.config.Ntopng.EndPoint, luaRestV2Get, interfaceDataPath, interfaceId)
-	req, err := http.NewRequest("GET", endpoint, nil)
+	req, err := http.NewRequestWithContext(context.Background(), "GET", endpoint, nil)
 	if err != nil {
 		return err
 	}
 	c.setCommonOptions(req, false)
 
-	body, status, err := getHttpResponseBody(getHttpClient(c.config.Ntopng.AllowUnsafeTLS), req)
+	body, status, _ := getHttpResponseBody(getHttpClient(c.config.Ntopng.AllowUnsafeTLS), req)
 	if status != http.StatusOK {
 		if body != nil {
 			return fmt.Errorf("request to interface data endpoint was not successful. Status: '%d', Response: '%v'",
@@ -249,13 +252,14 @@ func (c *Controller) setCommonOptions(req *http.Request, isJsonRequest bool) {
 	if isJsonRequest {
 		req.Header.Add("Content-Type", "application/json")
 	}
-	if c.config.Ntopng.AuthMethod == "cookie" {
+	switch c.config.Ntopng.AuthMethod {
+	case "cookie":
 		req.Header.Add("Cookie",
 			fmt.Sprintf("user=%s; password=%s",
 				c.config.Ntopng.User, c.config.Ntopng.Password))
-	} else if c.config.Ntopng.AuthMethod == "basic" {
+	case "basic":
 		req.SetBasicAuth(c.config.Ntopng.User, c.config.Ntopng.Password)
-	} else if c.config.Ntopng.AuthMethod == "token" {
+	case "token":
 		req.Header.Add("Authorization", fmt.Sprintf("Token %s", c.config.Ntopng.Token))
 	}
 }
@@ -263,6 +267,7 @@ func (c *Controller) setCommonOptions(req *http.Request, isJsonRequest bool) {
 func getHttpClient(allowInsecure bool) *http.Client {
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 	if allowInsecure {
+		// #nosec G402 -- InsecureSkipVerify is intentionally configurable via AllowUnsafeTLS setting
 		customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 	return &http.Client{Transport: customTransport}
