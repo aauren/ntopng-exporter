@@ -5,13 +5,14 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/aauren/ntopng-exporter/internal"
-	"github.com/aauren/ntopng-exporter/internal/config"
 	"net"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/aauren/ntopng-exporter/internal"
+	"github.com/aauren/ntopng-exporter/internal/config"
 )
 
 const (

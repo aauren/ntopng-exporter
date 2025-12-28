@@ -1,10 +1,11 @@
 package prometheus
 
 import (
+	"strconv"
+
 	"github.com/aauren/ntopng-exporter/internal/config"
 	"github.com/aauren/ntopng-exporter/internal/ntopng"
 	"github.com/prometheus/client_golang/prometheus"
-	"strconv"
 )
 
 var (
