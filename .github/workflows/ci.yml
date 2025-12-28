@@ -1,18 +1,19 @@
+---
 name: continuous-integration
 
-on:
+on:  # yamllint disable rule:truthy
   push:
     branches:
-    - main
-    - v[1-9].*
-    - prep-v[1-9].*
+      - main
+      - v[1-9].*
+      - prep-v[1-9].*
     tags:
-    - v[1-9].*
+      - v[1-9].*
   pull_request:
     branches:
-    - main
-    - v[1-9].*
-    - prep-v[1-9].*
+      - main
+      - v[1-9].*
+      - prep-v[1-9].*
 
 env:
   BUILDTIME_BASE: "golang:1.25.4"
@@ -27,154 +28,154 @@ jobs:
     name: ci-lint-markdown
     runs-on: ubuntu-latest
     steps:
-    - name: Check out code
-      uses: actions/checkout@v6
+      - name: Check out code
+        uses: actions/checkout@v6
 
-    - name: markdownlint-cli
-      uses: nosborn/github-action-markdown-cli@v3.3.0
-      with:
-        files: .
-        config_file: .markdownlint.yaml
+      - name: markdownlint-cli
+        uses: nosborn/github-action-markdown-cli@v3.3.0
+        with:
+          files: .
+          config_file: .markdownlint.yaml
 
   # Runs Go linting checks
   ci-lint-go:
     name: ci-lint-go
     runs-on: ubuntu-latest
     steps:
-    - name: Check out code into the Go module directory
-      uses: actions/checkout@v6
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v6
 
-    - name: Set up Go 1.x
-      uses: actions/setup-go@v6
-      with:
-        go-version: ${{ env.GO_VERSION }}
-      id: go
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+        id: go
 
-    - name: golangci-lint
-      uses: golangci/golangci-lint-action@v6
-      with:
-        version: v2
-        args: --timeout=5m
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v2
+          args: --timeout=5m
 
   # Runs Go tests
   ci-test:
     name: ci-test
     runs-on: ubuntu-latest
     steps:
-    - name: Check out code into the Go module directory
-      uses: actions/checkout@v6
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v6
 
-    - name: Set up Go 1.x
-      uses: actions/setup-go@v6
-      with:
-        go-version: ${{ env.GO_VERSION }}
-      id: go
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+        id: go
 
-    - name: Install dependencies
-      run: |
-        go get .
+      - name: Install dependencies
+        run: |
+          go get .
 
-    - name: Run tests
-      run: go test -v -race -coverprofile=coverage.out ./...
+      - name: Run tests
+        run: go test -v -race -coverprofile=coverage.out ./...
 
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v5
-      if: always()
-      with:
-        file: ./coverage.out
-        flags: unittests
-        fail_ci_if_error: false
-      continue-on-error: true
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        if: always()
+        with:
+          file: ./coverage.out
+          flags: unittests
+          fail_ci_if_error: false
+        continue-on-error: true
 
   # Builds ntopng-exporter binary
   ci-build-ntopng-exporter:
     name: ci-build-ntopng-exporter
     runs-on: ubuntu-latest
-    needs: 
+    needs:
       - ci-lint-markdown
       - ci-lint-go
       - ci-test
     steps:
-    - name: Check out code into the Go module directory
-      uses: actions/checkout@v6
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v6
 
-    - name: Set up Go 1.x
-      uses: actions/setup-go@v6
-      with:
-        go-version: ${{ env.GO_VERSION }}
-      id: go
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+        id: go
 
-    - name: Install dependencies
-      run: |
-        go get .
+      - name: Install dependencies
+        run: |
+          go get .
 
-    - name: Build
-      run: go build -v -ldflags '-s -w' ./...
-      env:
-        CGO_ENABLED: "0"
+      - name: Build
+        run: go build -v -ldflags '-s -w' ./...
+        env:
+          CGO_ENABLED: "0"
 
   # Builds Container only if a tag or a pull request from a source branch within the repository
   ci-build-container:
     runs-on: ubuntu-latest
     if: ${{ startsWith(github.ref, 'refs/tags/v') }}
     steps:
-    - name: Checkout
-      uses: actions/checkout@v6
+      - name: Checkout
+        uses: actions/checkout@v6
 
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Login to DockerHub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Extract metadata (tags, labels) for Docker (RC, Tag)
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: aauren/ntopng-exporter
+      - name: Extract metadata (tags, labels) for Docker (RC, Tag)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: aauren/ntopng-exporter
 
-    # Tagging a proper release, update latest
-    - name: Build and push - New Tag
-      uses: docker/build-push-action@v6
-      with:
-        context: .
-        platforms: |
-          linux/amd64
-          linux/arm64
-          linux/arm/v7
-          linux/s390x
-          linux/ppc64le
-        push: true
-        build-args: |
-          BUILDTIME_BASE=${{ env.BUILDTIME_BASE }}
-          RUNTIME_BASE=${{ env.RUNTIME_BASE }}
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
+      # Tagging a proper release, update latest
+      - name: Build and push - New Tag
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: |
+            linux/amd64
+            linux/arm64
+            linux/arm/v7
+            linux/s390x
+            linux/ppc64le
+          push: true
+          build-args: |
+            BUILDTIME_BASE=${{ env.BUILDTIME_BASE }}
+            RUNTIME_BASE=${{ env.RUNTIME_BASE }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
   # Runs Go Releaser on Tag Event
   ci-goreleaser-tag:
     runs-on: ubuntu-latest
     if: ${{ startsWith(github.ref, 'refs/tags/v') }}
     steps:
-    - name: Check out code into the Go module directory
-      uses: actions/checkout@v6
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v6
 
-    - name: Set up Go 1.x
-      uses: actions/setup-go@v6
-      with:
-        go-version: ${{ env.GO_VERSION }}
-      id: go
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+        id: go
 
-    - name: Run GoReleaser
-      uses: goreleaser/goreleaser-action@v6
-      with:
-        version: latest
-        args: release --clean
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
