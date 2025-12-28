@@ -2,11 +2,12 @@ package config
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
 	"net"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/spf13/viper"
 )
 
 const (
@@ -28,7 +29,7 @@ type ntopng struct {
 	EndPoint       string
 	User           string
 	Password       string
-	Token	       string
+	Token          string
 	AuthMethod     string
 	ScrapeInterval string
 	ScrapeTargets  []string
@@ -83,10 +84,10 @@ func ParseConfig() (Config, error) {
 	if err != nil {
 		return config, err
 	}
-    	// Check if environment variable NTOPNG_TOKEN is set
-    	if tokenEnv, exists := os.LookupEnv("NTOPNG_TOKEN"); exists {
-        	config.Ntopng.Token = tokenEnv
-    	}	
+	// Check if environment variable NTOPNG_TOKEN is set
+	if tokenEnv, exists := os.LookupEnv("NTOPNG_TOKEN"); exists {
+		config.Ntopng.Token = tokenEnv
+	}
 	err = config.validate()
 	return config, err
 }

@@ -30,7 +30,7 @@ type interfaceCollector struct {
 	speed               *prometheus.Desc
 	tcpPacketStats      *prometheus.Desc
 	throughputBPS       *prometheus.Desc
-	throughputPPS		*prometheus.Desc
+	throughputPPS       *prometheus.Desc
 }
 
 func NewNtopNGInterfaceCollector(ntopController *ntopng.Controller, config *config.Config) *interfaceCollector {

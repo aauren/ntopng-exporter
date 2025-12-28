@@ -3,17 +3,18 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/aauren/ntopng-exporter/internal"
 	"github.com/aauren/ntopng-exporter/internal/config"
 	ntopPrometheus "github.com/aauren/ntopng-exporter/internal/metrics/prometheus"
 	"github.com/aauren/ntopng-exporter/internal/ntopng"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 )
 
 func main() {
