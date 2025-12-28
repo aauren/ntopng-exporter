@@ -84,7 +84,7 @@ jobs:
         uses: codecov/codecov-action@v5
         if: always()
         with:
-          file: ./coverage.out
+          files: ./coverage.out
           flags: unittests
           fail_ci_if_error: false
         continue-on-error: true
