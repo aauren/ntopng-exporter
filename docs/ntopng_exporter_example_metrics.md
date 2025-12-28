@@ -1,5 +1,6 @@
 # List of Metrics Emitted by ntopng-exporter
 
+<!-- markdownlint-disable -->
 All metrics prefixed with `go_` indicate application performance metrics from ntopng-exporter itself.
 
 All metrics having to do with ntopng are prefixed with `ntopng_`. These are the current subsets of metrics:
@@ -205,3 +206,4 @@ All metrics having to do with ntopng are prefixed with `ntopng_`. These are the 
 # HELP promhttp_metric_handler_requests_total Total number of scrapes by HTTP status code.
 # TYPE promhttp_metric_handler_requests_total counter
 ```
+<!-- markdownlint-restore -->

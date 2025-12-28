@@ -33,9 +33,9 @@ that should outline all of the available configuration options as well as point 
 Modify the default config in any way that you need, and then copy it to one of the following configuration locations
 (listed in order of precedence):
 
-* `<user's home directory>/.ntopng-exporter/ntopng-exporter.yaml`
-* `/etc/ntopng-exporter/ntopng-exporter.yaml`
-* `./config/ntopng-exporter.yaml` (where `./` indicates the working directory that ntopng-exporter is using)
+- `<user's home directory>/.ntopng-exporter/ntopng-exporter.yaml`
+- `/etc/ntopng-exporter/ntopng-exporter.yaml`
+- `./config/ntopng-exporter.yaml` (where `./` indicates the working directory that ntopng-exporter is using)
 
 If you configure authentication options for ntopng-exporter, then your config file will contain sensitive information.
 As such, it is recommended that users change the permissions of the config file so that it is not widely readable:
