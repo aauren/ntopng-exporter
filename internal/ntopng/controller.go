@@ -73,11 +73,11 @@ func (c *Controller) CacheInterfaceIds() error {
 	endpoint := fmt.Sprintf("%s%s%s", c.config.Ntopng.EndPoint, luaRestV2Get, interfaceListPath)
 	req, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get response from ntopng interface endpoint: %v", err)
 	}
 	c.setCommonOptions(req, false)
 
-	body, status, err := getHttpResponseBody(getHttpClient(c.config.Ntopng.AllowUnsafeTLS), req)
+	body, status, _ := getHttpResponseBody(getHttpClient(c.config.Ntopng.AllowUnsafeTLS), req)
 	if status != http.StatusOK {
 		if body != nil {
 			return fmt.Errorf("request to interface endpoint was not successful. Status: '%d', Response: '%v'",
@@ -90,7 +90,8 @@ func (c *Controller) CacheInterfaceIds() error {
 
 	rawInterfaces, err := getRawJsonFromNtopResponse(body)
 	if err != nil {
-		return err
+		fmt.Printf("Received the following HTTP body response when we were expecting JSON: \n%s\n", body)
+		return fmt.Errorf("failed to parse JSON from HTTP body: %v", err)
 	}
 	var ifList []ntopInterface
 	err = json.Unmarshal(rawInterfaces, &ifList)
