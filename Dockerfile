@@ -1,6 +1,6 @@
-ARG BUILDTIME_BASE=golang:1.25.4
+ARG BUILDTIME_BASE=golang:1.25.5
 ARG RUNTIME_BASE=gcr.io/distroless/static:latest
-FROM ${BUILDTIME_BASE} as builder
+FROM ${BUILDTIME_BASE} AS builder
 
 WORKDIR /go/src/app
 ENV CGO_ENABLED=0

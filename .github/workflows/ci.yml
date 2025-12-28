@@ -16,9 +16,9 @@ on:  # yamllint disable rule:truthy
       - prep-v[1-9].*
 
 env:
-  BUILDTIME_BASE: "golang:1.25.4"
+  BUILDTIME_BASE: "golang:1.25.5"
   RUNTIME_BASE: "gcr.io/distroless/static"
-  GO_VERSION: "~1.25.4"
+  GO_VERSION: "~1.25.5"
   GOLANGCI_LINT_VERSION: "v2.6"
   GOLANGCI_LINT_TIMEOUT: "15m"
   GO_CACHE: "/home/runner/.cache/go-build"
