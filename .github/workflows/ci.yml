@@ -19,6 +19,8 @@ env:
   BUILDTIME_BASE: "golang:1.25.4"
   RUNTIME_BASE: "gcr.io/distroless/static"
   GO_VERSION: "~1.25.4"
+  GOLANGCI_LINT_VERSION: "v2.6"
+  GOLANGCI_LINT_TIMEOUT: "15m"
   GO_CACHE: "/home/runner/.cache/go-build"
   GO_MOD_CACHE: "/home/runner/go/pkg/mod"
 
@@ -52,10 +54,10 @@ jobs:
         id: go
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: v2
-          args: --timeout=5m
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          args: --timeout=${{ env.GOLANGCI_LINT_TIMEOUT }}
 
   # Runs Go tests
   ci-test:
