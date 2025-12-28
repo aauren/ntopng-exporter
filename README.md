@@ -16,6 +16,16 @@ is unlikely that many features that most people might want are available.
 However, if you do find something that is available via the API that I have so far not included here, PR's are always
 welcome!
 
+## Contributing
+
+If you'd like to contribute to ntopng-exporter, please see the [Development Guide](docs/development.md) for information
+on:
+
+- Setting up your development environment
+- Building and testing the project
+- Code style guidelines and linting
+- Making pull requests
+
 ## Installing
 
 Go to the GitHub [Releases Page](https://github.com/aauren/ntopng-exporter/releases) and download a release for your
