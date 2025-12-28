@@ -11,10 +11,11 @@ import (
 )
 
 const (
-	AllScrape       = "all"
-	HostScrape      = "hosts"
-	InterfaceScrape = "interfaces"
-	L7Protocols     = "l7protocols"
+	AllScrape              = "all"
+	HostScrape             = "hosts"
+	InterfaceScrape        = "interfaces"
+	L7Protocols            = "l7protocols"
+	DefaultMetricServePort = 3001
 )
 
 var (
@@ -75,7 +76,7 @@ func ParseConfig() (Config, error) {
 	viper.SetDefault("metric.excludeDNSMetrics", false)
 	viper.SetDefault("ntopng.scrapeInterval", "1m")
 	viper.SetDefault("ntopng.metric.serve.ip", "0.0.0.0")
-	viper.SetDefault("ntopng.metric.serve.port", 3001)
+	viper.SetDefault("ntopng.metric.serve.port", DefaultMetricServePort)
 	viper.SetDefault("ntopng.scrapeTargets", "all")
 	viper.SetDefault("ntopng.allowUnsafeTLS", false)
 
@@ -106,7 +107,7 @@ func (c *Config) validate() error {
 			return fmt.Errorf("ntopng token must be set when using token auth")
 		}
 	}
-	if c.Host.InterfacesToMonitor == nil || len(c.Host.InterfacesToMonitor) < 1 {
+	if len(c.Host.InterfacesToMonitor) < 1 {
 		return fmt.Errorf("must specify at least one interface to monitor")
 	}
 	for _, ifName := range c.Host.InterfacesToMonitor {
@@ -114,7 +115,7 @@ func (c *Config) validate() error {
 			return fmt.Errorf("interface name cannot be null or blank")
 		}
 	}
-	if c.Metric.LocalSubnetsOnly != nil && len(c.Metric.LocalSubnetsOnly) > 0 {
+	if len(c.Metric.LocalSubnetsOnly) > 0 {
 		for _, subnet := range c.Metric.LocalSubnetsOnly {
 			if _, _, err := net.ParseCIDR(subnet); err != nil {
 				return fmt.Errorf("subnet specified: '%s', is not a valid subnet: %v", subnet, err)

@@ -3,7 +3,7 @@ package ntopng
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 )
@@ -16,7 +16,7 @@ func getHttpResponseBody(client *http.Client, req *http.Request) (*[]byte, int, 
 	}
 	defer resp.Body.Close()
 
-	body, _ = ioutil.ReadAll(resp.Body)
+	body, _ = io.ReadAll(resp.Body)
 	return &body, resp.StatusCode, nil
 }
 

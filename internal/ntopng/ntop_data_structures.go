@@ -2,7 +2,6 @@ package ntopng
 
 import (
 	"encoding/json"
-	"fmt"
 )
 
 type ntopResponse struct {
@@ -99,10 +98,10 @@ type ntopThroughputSub struct {
 
 func (n ntopHost) String() string {
 	output, _ := json.MarshalIndent(n, "", "\t")
-	return fmt.Sprintf("%s", output)
+	return string(output)
 }
 
 func (n ntopInterfaceFull) String() string {
 	output, _ := json.MarshalIndent(n, "", "\t")
-	return fmt.Sprintf("%s", output)
+	return string(output)
 }

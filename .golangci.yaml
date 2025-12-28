@@ -1,0 +1,96 @@
+version: "2"
+linters:
+  enable:
+    - bodyclose
+    - copyloopvar
+    - depguard
+    - dogsled
+    - dupl
+    - durationcheck
+    - exhaustive
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - gosec
+    - lll
+    - misspell
+    - mnd
+    - nakedret
+    - noctx
+    - nolintlint
+    - staticcheck
+    - unconvert
+    - unparam
+  settings:
+    lll:
+      line-length: 140
+    depguard:
+      rules:
+        main:
+          files:
+            - "$all"
+            - "!$test"
+          list-mode: strict
+          allow:
+            - "$gostd"
+            - github.com/aauren/ntopng-exporter
+            - github.com/prometheus/client_golang
+            - github.com/spf13/viper
+        tests:
+          files:
+            - "$test"
+          list-mode: lax
+          allow:
+            - "$gostd"
+            - github.com/aauren/ntopng-exporter
+            - github.com/prometheus/client_golang
+            - github.com/spf13/viper
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - mnd
+        text: 'Magic number: [0-9]{1},'
+      - linters:
+          - mnd
+        text: 'Magic number: 0[0-7]{3},'
+      - linters:
+          - mnd
+        text: 'Magic number: 255,'
+      - linters:
+          - mnd
+        text: 'Magic number: 32,'
+      - linters:
+          - mnd
+        text: 'Magic number: 10,'
+      - linters:
+          - lll
+        path: _test\.go
+      - linters:
+          - gocritic
+        text: appendAssign
+      - linters:
+          - gochecknoinits
+        path: .*/cmd/.*\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
