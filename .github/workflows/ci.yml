@@ -19,7 +19,7 @@ env:
   BUILDTIME_BASE: "golang:1.26.2"
   RUNTIME_BASE: "gcr.io/distroless/static"
   GO_VERSION: "~1.26.2"
-  GOLANGCI_LINT_VERSION: "v2.6"
+  GOLANGCI_LINT_VERSION: "v2.11"
   GOLANGCI_LINT_TIMEOUT: "15m"
   GO_CACHE: "/home/runner/.cache/go-build"
   GO_MOD_CACHE: "/home/runner/go/pkg/mod"
