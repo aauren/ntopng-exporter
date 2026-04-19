@@ -10,7 +10,7 @@ import (
 
 func getHttpResponseBody(client *http.Client, req *http.Request) (*[]byte, int, error) {
 	var body []byte
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec // URL is constructed from trusted application configuration, not user input
 	if err != nil {
 		return &body, 0, err
 	}
