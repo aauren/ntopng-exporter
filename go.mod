@@ -1,6 +1,6 @@
 module github.com/aauren/ntopng-exporter
 
-go 1.25.4
+go 1.26.2
 
 require (
 	github.com/prometheus/client_golang v1.23.2
