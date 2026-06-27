@@ -1,0 +1,132 @@
+package ntopng
+
+import (
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/aauren/ntopng-exporter/internal/config"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+const testHostIP = "192.168.1.10"
+
+// TestHostKeyDistinguishesDimensions guards the cache key contract: IP, interface, and
+// VLAN are independent dimensions, so the same IP seen on different interfaces or VLANs
+// must never collapse into a single map entry. Dropping a field from hostKey breaks this.
+func TestHostKeyDistinguishesDimensions(t *testing.T) {
+	t.Parallel()
+	base := hostKey{IP: testHostIP, IfID: 1, VLAN: 0}
+	tests := []struct {
+		name      string
+		other     hostKey
+		wantEqual bool
+	}{
+		{"identical keys collide", hostKey{IP: testHostIP, IfID: 1, VLAN: 0}, true},
+		{"different ip is distinct", hostKey{IP: "10.0.0.1", IfID: 1, VLAN: 0}, false},
+		{"different interface is distinct", hostKey{IP: testHostIP, IfID: 2, VLAN: 0}, false},
+		{"different vlan is distinct", hostKey{IP: testHostIP, IfID: 1, VLAN: 20}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			m := map[hostKey]string{base: "first"}
+			m[tt.other] = "second"
+			if tt.wantEqual {
+				assert.Len(t, m, 1, "identical keys should collapse to one entry")
+			} else {
+				assert.Len(t, m, 2, "distinct keys should remain separate entries")
+			}
+		})
+	}
+}
+
+// ntopHostResponse mirrors the host custom_data endpoint envelope so we can drive
+// scrapeHostEndpoint through a stub server using the real ntopHost JSON tags.
+type ntopHostResponse struct {
+	RcStr string     `json:"rc_str"`
+	Rsp   []ntopHost `json:"rsp"`
+}
+
+// TestScrapeHostEndpointKeepsHostPerInterfaceAndVLAN is the regression guard for the
+// composite key: ntopng reports the same IP under every interface and VLAN it's seen on,
+// and every (ip, ifid, vlan) combination must survive instead of clobbering each other
+// the way the old IP-only cache key did.
+func TestScrapeHostEndpointKeepsHostPerInterfaceAndVLAN(t *testing.T) {
+	t.Parallel()
+	const (
+		localIfID    = 1
+		vlanIfID     = 2
+		localIfName  = "eth0"
+		vlanIfName   = "eth1"
+		localBytes   = 1000.0
+		crossIfBytes = 50.0
+		vlanBytes    = 75.0
+		taggedVLAN   = 20
+	)
+	// Keyed by the ifid the stub is asked about, so each scrape returns that interface's view.
+	responses := map[int][]ntopHost{
+		localIfID: {
+			{IP: testHostIP, IfID: localIfID, VLAN: 0, BytesSent: localBytes},
+		},
+		vlanIfID: {
+			{IP: testHostIP, IfID: vlanIfID, VLAN: 0, BytesSent: crossIfBytes},
+			{IP: testHostIP, IfID: vlanIfID, VLAN: taggedVLAN, BytesSent: vlanBytes},
+		},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("reading request body: %v", err)
+			return
+		}
+		var payload struct {
+			IfID int `json:"ifid"`
+		}
+		if err := json.Unmarshal(body, &payload); err != nil {
+			t.Errorf("unmarshaling request payload: %v", err)
+			return
+		}
+		out, err := json.Marshal(ntopHostResponse{RcStr: "OK", Rsp: responses[payload.IfID]})
+		if err != nil {
+			t.Errorf("marshaling stub response: %v", err)
+			return
+		}
+		if _, err := w.Write(out); err != nil {
+			t.Errorf("writing stub response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	c := CreateController(&config.Config{}, nil)
+	c.config.Ntopng.EndPoint = server.URL
+	c.config.Ntopng.AuthMethod = "none"
+	c.ifList = map[string]int{localIfName: localIfID, vlanIfName: vlanIfID}
+
+	hosts := make(map[hostKey]ntopHost)
+	require.NoError(t, c.scrapeHostEndpoint(localIfID, hosts))
+	require.NoError(t, c.scrapeHostEndpoint(vlanIfID, hosts))
+
+	require.Len(t, hosts, 3, "every (ip, ifid, vlan) combination should be retained")
+
+	checks := []struct {
+		name      string
+		key       hostKey
+		wantBytes float64
+		wantIf    string
+	}{
+		{"local interface retained", hostKey{IP: testHostIP, IfID: localIfID, VLAN: 0}, localBytes, localIfName},
+		{"same ip on second interface retained", hostKey{IP: testHostIP, IfID: vlanIfID, VLAN: 0}, crossIfBytes, vlanIfName},
+		{"same ip and interface on tagged vlan retained", hostKey{IP: testHostIP, IfID: vlanIfID, VLAN: taggedVLAN}, vlanBytes, vlanIfName},
+	}
+	for _, ck := range checks {
+		got, ok := hosts[ck.key]
+		require.Truef(t, ok, "%s: expected map entry to be present", ck.name)
+		assert.Equalf(t, ck.wantBytes, got.BytesSent, "%s: bytes sent", ck.name)
+		assert.Equalf(t, ck.wantIf, got.IfName, "%s: resolved interface name", ck.name)
+	}
+}
