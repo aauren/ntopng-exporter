@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: markdownlint-cli
         uses: nosborn/github-action-markdown-cli@v3.5.0
@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Go 1.x
         uses: actions/setup-go@v6
@@ -65,7 +65,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Go 1.x
         uses: actions/setup-go@v6
@@ -99,7 +99,7 @@ jobs:
       - ci-test
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Go 1.x
         uses: actions/setup-go@v6
@@ -124,7 +124,7 @@ jobs:
     needs: ci-build-ntopng-exporter
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -170,7 +170,7 @@ jobs:
     needs: ci-build-ntopng-exporter
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Go 1.x
         uses: actions/setup-go@v6
