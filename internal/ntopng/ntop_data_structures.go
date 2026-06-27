@@ -15,6 +15,15 @@ type ntopInterface struct {
 	IfName string `json:"ifname"`
 }
 
+// hostKey matches how ntopng identifies a host (IP@VLAN) plus the interface it was
+// seen on, so the same IP across interfaces or VLANs stays as separate cache entries
+// instead of clobbering each other - each combination is its own metric series too.
+type hostKey struct {
+	IP   string
+	IfID int
+	VLAN int
+}
+
 type ntopHost struct {
 	ActiveFlowsAsClient float64 `json:"active_flows.as_client"`
 	ActiveFlowsAsServer float64 `json:"active_flows.as_server"`

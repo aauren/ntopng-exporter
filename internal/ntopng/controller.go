@@ -29,7 +29,7 @@ const (
 type Controller struct {
 	config        *config.Config
 	ifList        map[string]int
-	HostList      map[string]ntopHost
+	HostList      map[hostKey]ntopHost
 	InterfaceList map[string]ntopInterfaceFull
 	ListRWMutex   *sync.RWMutex
 	stopChan      <-chan struct{}
@@ -121,7 +121,7 @@ func (c *Controller) CacheInterfaceIds() error {
 func (c *Controller) ScrapeHostEndpointForAllInterfaces() {
 	// tempNtopHosts is made here to minimize the amount of time we have to lock the list and also to make sure that we
 	// don't keep a list of ever growing hosts in our map which could eventually overwhelm the system
-	tempNtopHosts := make(map[string]ntopHost)
+	tempNtopHosts := make(map[hostKey]ntopHost)
 	for _, configuredIf := range c.config.Host.InterfacesToMonitor {
 		if err := c.scrapeHostEndpoint(c.ifList[configuredIf], tempNtopHosts); err != nil {
 			fmt.Printf("failed to scrape interface '%s' with error: %v", configuredIf, err)
@@ -132,7 +132,7 @@ func (c *Controller) ScrapeHostEndpointForAllInterfaces() {
 	c.HostList = tempNtopHosts
 }
 
-func (c *Controller) scrapeHostEndpoint(interfaceId int, tempNtopHosts map[string]ntopHost) error {
+func (c *Controller) scrapeHostEndpoint(interfaceId int, tempNtopHosts map[hostKey]ntopHost) error {
 	endpoint := fmt.Sprintf("%s%s%s", c.config.Ntopng.EndPoint, luaRestV2Get, hostCustomPath)
 	payload := []byte(fmt.Sprintf(`{"ifid": %d, "field_alias": "%s"}`, interfaceId, hostCustomFields))
 	req, err := http.NewRequestWithContext(context.Background(), "POST", endpoint, bytes.NewBuffer(payload))
@@ -169,12 +169,6 @@ func (c *Controller) scrapeHostEndpoint(interfaceId int, tempNtopHosts map[strin
 		}
 	}
 	for _, myHost := range hostList {
-		// If we already have this host in our cache and it has a different ifid than we are currently processing, don't
-		// overwrite it, and print a warning.
-		if err = c.checkForDuplicateInterfaces(&myHost); err != nil {
-			fmt.Println(err)
-			continue
-		}
 		if len(parsedSubnets) > 0 {
 			validIP := false
 			parsedIP := net.ParseIP(myHost.IP)
@@ -192,7 +186,7 @@ func (c *Controller) scrapeHostEndpoint(interfaceId int, tempNtopHosts map[strin
 			fmt.Printf("Could not resolve interface: %d, this should not happen", myHost.IfID)
 			myHost.IfName = strconv.Itoa(myHost.IfID)
 		}
-		tempNtopHosts[myHost.IP] = myHost
+		tempNtopHosts[hostKey{IP: myHost.IP, IfID: myHost.IfID, VLAN: myHost.VLAN}] = myHost
 	}
 	return nil
 }
