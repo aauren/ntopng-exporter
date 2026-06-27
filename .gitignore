@@ -126,3 +126,6 @@ fabric.properties
 
 # Ignore built binaries
 ntopng-exporter
+
+# Ignore codegraph
+.codegraph
