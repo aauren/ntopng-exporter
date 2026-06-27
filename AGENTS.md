@@ -39,7 +39,7 @@ go run ntopng-exporter.go
 docker build .
 
 # Build with custom base images
-docker build --build-arg BUILDTIME_BASE=golang:1.25.4 \
+docker build --build-arg BUILDTIME_BASE=golang:1.26.4 \
              --build-arg RUNTIME_BASE=gcr.io/distroless/static .
 ```
 
