@@ -24,7 +24,7 @@ just exploring the codebase.
 
 Before you begin, ensure you have the following installed:
 
-- **Go 1.25.4 or later** - [Download Go](https://golang.org/dl/)
+- **Go 1.26.4 or later** - [Download Go](https://golang.org/dl/)
 - **golangci-lint v2** - [Installation instructions](https://golangci-lint.run/welcome/install/)
 - **Git** - For version control
 - **Docker** (optional) - For building container images
