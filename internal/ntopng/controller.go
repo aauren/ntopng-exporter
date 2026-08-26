@@ -24,15 +24,17 @@ const (
 	hostCustomPath    = "/host/custom_data.lua"
 	interfaceListPath = "/ntopng/interfaces.lua"
 	interfaceDataPath = "/interface/data.lua"
+	l7DataPath        = "/interface/l7/data.lua"
 )
 
 type Controller struct {
-	config        *config.Config
-	ifList        map[string]int
-	HostList      map[hostKey]ntopHost
-	InterfaceList map[string]ntopInterfaceFull
-	ListRWMutex   *sync.RWMutex
-	stopChan      <-chan struct{}
+	config         *config.Config
+	ifList         map[string]int
+	HostList       map[hostKey]ntopHost
+	InterfaceList  map[string]ntopInterfaceFull
+	L7ProtocolList map[string]ntopL7Protocol
+	ListRWMutex    *sync.RWMutex
+	stopChan       <-chan struct{}
 }
 
 func CreateController(config *config.Config, stopChan <-chan struct{}) Controller {
@@ -69,6 +71,10 @@ func (c *Controller) ScrapeAllConfiguredTargets() {
 	if internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, config.InterfaceScrape) ||
 		internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, config.AllScrape) {
 		c.ScrapeInterfaceEndpointForAllInterfaces()
+	}
+	if internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, config.L7Protocols) ||
+		internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, config.AllScrape) {
+		c.ScrapeL7ProtocolEndpointForAllInterfaces()
 	}
 }
 
@@ -239,6 +245,55 @@ func (c *Controller) scrapeInterfaceEndpoint(interfaceId int, tempInterfaces map
 		}
 	}
 	tempInterfaces[ifFull.IfName] = ifFull
+	return nil
+}
+
+func (c *Controller) ScrapeL7ProtocolEndpointForAllInterfaces() {
+	tempL7Protocols := make(map[string]ntopL7Protocol)
+	for _, configuredIf := range c.config.Host.InterfacesToMonitor {
+		if err := c.scrapeL7ProtocolEndpoint(c.ifList[configuredIf], tempL7Protocols); err != nil {
+			fmt.Printf("failed to scrape L7 protocols for interface '%s' with error: %v", configuredIf, err)
+		}
+	}
+	c.ListRWMutex.Lock()
+	defer c.ListRWMutex.Unlock()
+	c.L7ProtocolList = tempL7Protocols
+}
+
+func (c *Controller) scrapeL7ProtocolEndpoint(interfaceId int, tempL7Protocols map[string]ntopL7Protocol) error {
+	endpoint := fmt.Sprintf("%s%s%s?ifid=%d", c.config.Ntopng.EndPoint, luaRestV2Get, l7DataPath, interfaceId)
+	req, err := http.NewRequestWithContext(context.Background(), "GET", endpoint, nil)
+	if err != nil {
+		return err
+	}
+	c.setCommonOptions(req, false)
+
+	body, status, _ := getHttpResponseBody(getHttpClient(c.config.Ntopng.AllowUnsafeTLS), req)
+	if status != http.StatusOK {
+		if body != nil {
+			return fmt.Errorf("request to L7 protocol endpoint was not successful. Status: '%d', Response: '%v'",
+				status, *body)
+		}
+		return fmt.Errorf("request to L7 protocol endpoint was not successful. Status: '%d'", status)
+	}
+
+	rawProtocols, err := getRawJsonFromNtopResponse(body)
+	if err != nil {
+		return err
+	}
+	var protocols []ntopL7Protocol
+	if err := json.Unmarshal(rawProtocols, &protocols); err != nil {
+		return fmt.Errorf("was not able to parse L7 protocols from ntopng: %v", err)
+	}
+	ifName, err := c.ResolveIfID(interfaceId)
+	if err != nil {
+		return fmt.Errorf("could not resolve interface: %d: %v", interfaceId, err)
+	}
+	for _, protocol := range protocols {
+		protocol.IfID = interfaceId
+		protocol.IfName = ifName
+		tempL7Protocols[fmt.Sprintf("%d:%s", interfaceId, protocol.Application.Name)] = protocol
+	}
 	return nil
 }
 

@@ -130,3 +130,30 @@ func TestScrapeHostEndpointKeepsHostPerInterfaceAndVLAN(t *testing.T) {
 		assert.Equalf(t, ck.wantIf, got.IfName, "%s: resolved interface name", ck.name)
 	}
 }
+
+func TestScrapeL7ProtocolEndpoint(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/lua/rest/v2/get/interface/l7/data.lua", r.URL.Path)
+		assert.Equal(t, "1", r.URL.Query().Get("ifid"))
+		_, err := w.Write([]byte(`{"rc_str":"OK","rsp":[{"application":{"name":"HTTP","id":7},` +
+			`"bytes":{"rcvd":100,"sent":50,"total":150,"percentage":75},` +
+			`"packets":{"rcvd":10,"sent":5,"total":15},"breed":"Safe","tot_num_flows":2}]}`))
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	c := CreateController(&config.Config{}, nil)
+	c.config.Ntopng.EndPoint = server.URL
+	c.config.Ntopng.AuthMethod = "none"
+	c.ifList = map[string]int{"eth0": 1}
+	protocols := make(map[string]ntopL7Protocol)
+
+	require.NoError(t, c.scrapeL7ProtocolEndpoint(1, protocols))
+	protocol, ok := protocols["1:HTTP"]
+	require.True(t, ok)
+	assert.Equal(t, "eth0", protocol.IfName)
+	assert.Equal(t, 100.0, protocol.Bytes.Received)
+	assert.Equal(t, 15.0, protocol.Packets.Total)
+	assert.Equal(t, 2.0, protocol.Flows)
+}

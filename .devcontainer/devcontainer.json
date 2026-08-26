@@ -1,0 +1,33 @@
+{
+  "name": "ntopng-exporter Dev Environment",
+  "image": "mcr.microsoft.com/devcontainers/go:1.26-trixie",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "moby": false
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "go.toolsManagement.checkForUpdates": "local",
+        "go.useLanguageServer": true
+      },
+      "extensions": [
+        "golang.go",
+        "ms-azuretools.vscode-docker",
+        "redhat.vscode-yaml"
+      ]
+    }
+  },
+  // "mounts": [
+  //   "source=ntopng-exporter-go-cache,target=/go/pkg,type=volume"
+  // ],
+  "mounts": [
+    "source=/home/nstone/ntopng-exporter,target=/etc/ntopng-exporter,type=bind"
+  ],
+  "postCreateCommand": "go mod download",
+  "runArgs": [
+    "--init"
+  ]
+}

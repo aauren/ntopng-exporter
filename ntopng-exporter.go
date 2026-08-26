@@ -69,6 +69,11 @@ func serveMetrics(ntopController *ntopng.Controller, myConfig *config.Config) *h
 		ntopCollector := ntopPrometheus.NewNtopNGInterfaceCollector(ntopController, myConfig)
 		prometheus.MustRegister(ntopCollector)
 	}
+	if internal.IsItemInArray(myConfig.Ntopng.ScrapeTargets, config.L7Protocols) ||
+		internal.IsItemInArray(myConfig.Ntopng.ScrapeTargets, config.AllScrape) {
+		ntopCollector := ntopPrometheus.NewNtopNGL7Collector(ntopController, myConfig)
+		prometheus.MustRegister(ntopCollector)
+	}
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 

@@ -6,6 +6,8 @@ All metrics prefixed with `go_` indicate application performance metrics from nt
 All metrics having to do with ntopng are prefixed with `ntopng_`. These are the current subsets of metrics:
 - `ntopng_interface_` metrics - These metrics are all labeled with the interface name and the interface ID that ntopng keeps internally. They indicate metrics that are specific to an individual interface
 - `ntopng_host_` metrics - These metrics are all labeled with the IP, MAC address, interface name, interface ID, and name of the host (if ntopng can find it). They indicate metrics that are specific to individual hosts on a given interface.
+- `ntopng_l7_` metrics - These metrics are labeled with the interface, application protocol, application ID, and
+	protocol breed. They indicate traffic statistics for each application protocol on an interface.
 
 ```
 # HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.
@@ -178,6 +180,27 @@ All metrics having to do with ntopng are prefixed with `ntopng_`. These are the 
 
 # HELP ntopng_interface_tcp_packet_stats tcp packet stats by type
 # TYPE ntopng_interface_tcp_packet_stats counter
+
+# HELP ntopng_l7_bytes_rcvd total number of bytes received by application protocol
+# TYPE ntopng_l7_bytes_rcvd counter
+
+# HELP ntopng_l7_bytes_sent total number of bytes sent by application protocol
+# TYPE ntopng_l7_bytes_sent counter
+
+# HELP ntopng_l7_bytes_total total number of bytes by application protocol
+# TYPE ntopng_l7_bytes_total counter
+
+# HELP ntopng_l7_packets_rcvd total number of packets received by application protocol
+# TYPE ntopng_l7_packets_rcvd counter
+
+# HELP ntopng_l7_packets_sent total number of packets sent by application protocol
+# TYPE ntopng_l7_packets_sent counter
+
+# HELP ntopng_l7_packets_total total number of packets by application protocol
+# TYPE ntopng_l7_packets_total counter
+
+# HELP ntopng_l7_flows total number of flows by application protocol
+# TYPE ntopng_l7_flows gauge
 
 # HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
 # TYPE process_cpu_seconds_total counter
