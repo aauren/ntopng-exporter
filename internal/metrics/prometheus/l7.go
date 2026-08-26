@@ -8,7 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var l7Labels = []string{"ifname", "ifid", "application", "application_id", "breed"}
+var l7Labels = []string{interfaceNameLabel, "ifid", "application", "application_id", "breed"}
 
 type l7Collector struct {
 	ntopNGController *ntopng.Controller
