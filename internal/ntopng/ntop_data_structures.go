@@ -89,6 +89,34 @@ type ntopInterfaceFull struct {
 	Throughput          ntopThroughput     `json:"throughput"`
 }
 
+type ntopL7Protocol struct {
+	Application ntopL7Application `json:"application"`
+	Bytes       ntopL7Bytes       `json:"bytes"`
+	Packets     ntopL7Packets     `json:"packets"`
+	Breed       string            `json:"breed"`
+	Flows       float64           `json:"tot_num_flows"`
+	IfID        int               `json:"-"`
+	IfName      string            `json:"-"`
+}
+
+type ntopL7Application struct {
+	Name string `json:"name"`
+	ID   int    `json:"id"`
+}
+
+type ntopL7Bytes struct {
+	Received   float64 `json:"rcvd"`
+	Sent       float64 `json:"sent"`
+	Total      float64 `json:"total"`
+	Percentage float64 `json:"percentage"`
+}
+
+type ntopL7Packets struct {
+	Received float64 `json:"rcvd"`
+	Sent     float64 `json:"sent"`
+	Total    float64 `json:"total"`
+}
+
 type ntopTCPPacketStats struct {
 	Lost            float64 `json:"lost"`
 	OutOfOrder      float64 `json:"out_of_order"`

@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	hostLabels       = []string{"ip", "ifname", "mac", "name", "vlan"}
+	hostLabels       = []string{"ip", interfaceNameLabel, "mac", "name", "vlan"}
 	basicDNSLabels   = deepAppend(hostLabels, "direction")
 	DNSRepliesLabels = deepAppend(basicDNSLabels, "status")
 	DNSQueriesLabels = deepAppend(basicDNSLabels, "record_type")

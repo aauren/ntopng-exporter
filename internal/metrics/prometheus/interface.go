@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	interfaceLabels  = []string{"ifname", "ifid"}
+	interfaceLabels  = []string{interfaceNameLabel, "ifid"}
 	tcpPacketLabels  = deepAppend(interfaceLabels, "type")
 	throughputLabels = deepAppend(interfaceLabels, "direction")
 )
