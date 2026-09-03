@@ -68,17 +68,26 @@ func (c *Controller) RunController() {
 }
 
 func (c *Controller) ScrapeAllConfiguredTargets() {
+	// Because all targets and interfaces are scraped serially, requestTimeout alone can't stop a cycle from
+	// overrunning the interval, so we put a deadline on the whole cycle. ParseConfig has already validated the
+	// interval, which is why we just skip the deadline if it somehow doesn't parse here.
+	cycleCtx := c.ctx
+	if scrapeInterval, err := time.ParseDuration(c.config.Ntopng.ScrapeInterval); err == nil && scrapeInterval > 0 {
+		var cancel context.CancelFunc
+		cycleCtx, cancel = context.WithTimeout(c.ctx, scrapeInterval)
+		defer cancel()
+	}
 	if internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, config.HostScrape) ||
 		internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, config.AllScrape) {
-		c.ScrapeHostEndpointForAllInterfaces()
+		c.ScrapeHostEndpointForAllInterfaces(cycleCtx)
 	}
 	if internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, config.InterfaceScrape) ||
 		internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, config.AllScrape) {
-		c.ScrapeInterfaceEndpointForAllInterfaces()
+		c.ScrapeInterfaceEndpointForAllInterfaces(cycleCtx)
 	}
 	if internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, config.L7Protocols) ||
 		internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, config.AllScrape) {
-		c.ScrapeL7ProtocolEndpointForAllInterfaces()
+		c.ScrapeL7ProtocolEndpointForAllInterfaces(cycleCtx)
 	}
 }
 
@@ -131,13 +140,13 @@ func (c *Controller) CacheInterfaceIds() error {
 	return nil
 }
 
-func (c *Controller) ScrapeHostEndpointForAllInterfaces() {
+func (c *Controller) ScrapeHostEndpointForAllInterfaces(ctx context.Context) {
 	// tempNtopHosts is made here to minimize the amount of time we have to lock the list and also to make sure that we
 	// don't keep a list of ever growing hosts in our map which could eventually overwhelm the system
 	tempNtopHosts := make(map[hostKey]ntopHost)
 	for _, configuredIf := range c.config.Host.InterfacesToMonitor {
 		// We stay quiet on context.Canceled because it just means we're shutting down mid-scrape
-		if err := c.scrapeHostEndpoint(c.ifList[configuredIf], tempNtopHosts); err != nil && !errors.Is(err, context.Canceled) {
+		if err := c.scrapeHostEndpoint(ctx, c.ifList[configuredIf], tempNtopHosts); err != nil && !errors.Is(err, context.Canceled) {
 			fmt.Printf("failed to scrape interface '%s' with error: %v", configuredIf, err)
 		}
 	}
@@ -146,10 +155,10 @@ func (c *Controller) ScrapeHostEndpointForAllInterfaces() {
 	c.HostList = tempNtopHosts
 }
 
-func (c *Controller) scrapeHostEndpoint(interfaceId int, tempNtopHosts map[hostKey]ntopHost) error {
+func (c *Controller) scrapeHostEndpoint(ctx context.Context, interfaceId int, tempNtopHosts map[hostKey]ntopHost) error {
 	endpoint := fmt.Sprintf("%s%s%s", c.config.Ntopng.EndPoint, luaRestV2Get, hostCustomPath)
 	payload := []byte(fmt.Sprintf(`{"ifid": %d, "field_alias": "%s"}`, interfaceId, hostCustomFields))
-	req, err := http.NewRequestWithContext(c.ctx, "POST", endpoint, bytes.NewBuffer(payload))
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(payload))
 	if err != nil {
 		return err
 	}
@@ -208,13 +217,13 @@ func (c *Controller) scrapeHostEndpoint(interfaceId int, tempNtopHosts map[hostK
 	return nil
 }
 
-func (c *Controller) ScrapeInterfaceEndpointForAllInterfaces() {
+func (c *Controller) ScrapeInterfaceEndpointForAllInterfaces(ctx context.Context) {
 	// tempNtopInterfaces is made here to minimize the amount of time we have to lock the list and also to make sure that we
 	// don't keep a list of ever growing hosts in our map which could eventually overwhelm the system
 	tempNtopInterfaces := make(map[string]ntopInterfaceFull)
 	for _, configuredIf := range c.config.Host.InterfacesToMonitor {
 		// We stay quiet on context.Canceled because it just means we're shutting down mid-scrape
-		if err := c.scrapeInterfaceEndpoint(c.ifList[configuredIf], tempNtopInterfaces); err != nil && !errors.Is(err, context.Canceled) {
+		if err := c.scrapeInterfaceEndpoint(ctx, c.ifList[configuredIf], tempNtopInterfaces); err != nil && !errors.Is(err, context.Canceled) {
 			fmt.Printf("failed to scrape interface '%s' with error: %v", configuredIf, err)
 		}
 	}
@@ -223,10 +232,10 @@ func (c *Controller) ScrapeInterfaceEndpointForAllInterfaces() {
 	c.InterfaceList = tempNtopInterfaces
 }
 
-func (c *Controller) scrapeInterfaceEndpoint(interfaceId int, tempInterfaces map[string]ntopInterfaceFull) error {
+func (c *Controller) scrapeInterfaceEndpoint(ctx context.Context, interfaceId int, tempInterfaces map[string]ntopInterfaceFull) error {
 	endpoint := fmt.Sprintf("%s%s%s?ifid=%d",
 		c.config.Ntopng.EndPoint, luaRestV2Get, interfaceDataPath, interfaceId)
-	req, err := http.NewRequestWithContext(c.ctx, "GET", endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	if err != nil {
 		return err
 	}
@@ -263,11 +272,11 @@ func (c *Controller) scrapeInterfaceEndpoint(interfaceId int, tempInterfaces map
 	return nil
 }
 
-func (c *Controller) ScrapeL7ProtocolEndpointForAllInterfaces() {
+func (c *Controller) ScrapeL7ProtocolEndpointForAllInterfaces(ctx context.Context) {
 	tempL7Protocols := make(map[string]ntopL7Protocol)
 	for _, configuredIf := range c.config.Host.InterfacesToMonitor {
 		// We stay quiet on context.Canceled because it just means we're shutting down mid-scrape
-		if err := c.scrapeL7ProtocolEndpoint(c.ifList[configuredIf], tempL7Protocols); err != nil && !errors.Is(err, context.Canceled) {
+		if err := c.scrapeL7ProtocolEndpoint(ctx, c.ifList[configuredIf], tempL7Protocols); err != nil && !errors.Is(err, context.Canceled) {
 			fmt.Printf("failed to scrape L7 protocols for interface '%s' with error: %v", configuredIf, err)
 		}
 	}
@@ -276,9 +285,9 @@ func (c *Controller) ScrapeL7ProtocolEndpointForAllInterfaces() {
 	c.L7ProtocolList = tempL7Protocols
 }
 
-func (c *Controller) scrapeL7ProtocolEndpoint(interfaceId int, tempL7Protocols map[string]ntopL7Protocol) error {
+func (c *Controller) scrapeL7ProtocolEndpoint(ctx context.Context, interfaceId int, tempL7Protocols map[string]ntopL7Protocol) error {
 	endpoint := fmt.Sprintf("%s%s%s?ifid=%d", c.config.Ntopng.EndPoint, luaRestV2Get, l7DataPath, interfaceId)
-	req, err := http.NewRequestWithContext(c.ctx, "GET", endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	if err != nil {
 		return err
 	}

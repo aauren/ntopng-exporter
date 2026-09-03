@@ -17,6 +17,7 @@ import (
 const (
 	testAuthMethod = "none"
 	testHostIP     = "192.168.1.10"
+	testIfName     = "eth0"
 )
 
 // TestHostKeyDistinguishesDimensions guards the cache key contract: IP, interface, and
@@ -65,7 +66,7 @@ func TestScrapeHostEndpointKeepsHostPerInterfaceAndVLAN(t *testing.T) {
 	const (
 		localIfID    = 1
 		vlanIfID     = 2
-		localIfName  = "eth0"
+		localIfName  = testIfName
 		vlanIfName   = "eth1"
 		localBytes   = 1000.0
 		crossIfBytes = 50.0
@@ -115,8 +116,8 @@ func TestScrapeHostEndpointKeepsHostPerInterfaceAndVLAN(t *testing.T) {
 	c.ifList = map[string]int{localIfName: localIfID, vlanIfName: vlanIfID}
 
 	hosts := make(map[hostKey]ntopHost)
-	require.NoError(t, c.scrapeHostEndpoint(localIfID, hosts))
-	require.NoError(t, c.scrapeHostEndpoint(vlanIfID, hosts))
+	require.NoError(t, c.scrapeHostEndpoint(context.Background(), localIfID, hosts))
+	require.NoError(t, c.scrapeHostEndpoint(context.Background(), vlanIfID, hosts))
 
 	require.Len(t, hosts, 3, "every (ip, ifid, vlan) combination should be retained")
 
@@ -153,13 +154,13 @@ func TestScrapeL7ProtocolEndpoint(t *testing.T) {
 	c := CreateController(context.Background(), &config.Config{}, config.DefaultRequestTimeout)
 	c.config.Ntopng.EndPoint = server.URL
 	c.config.Ntopng.AuthMethod = testAuthMethod
-	c.ifList = map[string]int{"eth0": 1}
+	c.ifList = map[string]int{testIfName: 1}
 	protocols := make(map[string]ntopL7Protocol)
 
-	require.NoError(t, c.scrapeL7ProtocolEndpoint(1, protocols))
+	require.NoError(t, c.scrapeL7ProtocolEndpoint(context.Background(), 1, protocols))
 	protocol, ok := protocols["1:HTTP"]
 	require.True(t, ok)
-	assert.Equal(t, "eth0", protocol.IfName)
+	assert.Equal(t, testIfName, protocol.IfName)
 	assert.Equal(t, 100.0, protocol.Bytes.Received)
 	assert.Equal(t, 15.0, protocol.Packets.Total)
 	assert.Equal(t, 2.0, protocol.Flows)
@@ -178,11 +179,11 @@ func TestScrapeL7ProtocolEndpointHonorsControllerContext(t *testing.T) {
 	c := CreateController(ctx, &config.Config{}, config.DefaultRequestTimeout)
 	c.config.Ntopng.EndPoint = server.URL
 	c.config.Ntopng.AuthMethod = testAuthMethod
-	c.ifList = map[string]int{"eth0": 1}
+	c.ifList = map[string]int{testIfName: 1}
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- c.scrapeL7ProtocolEndpoint(1, make(map[string]ntopL7Protocol))
+		errCh <- c.scrapeL7ProtocolEndpoint(ctx, 1, make(map[string]ntopL7Protocol))
 	}()
 
 	select {
@@ -197,5 +198,37 @@ func TestScrapeL7ProtocolEndpointHonorsControllerContext(t *testing.T) {
 		require.ErrorIs(t, err, context.Canceled)
 	case <-time.After(time.Second):
 		t.Fatal("L7 request did not stop after canceling the controller context")
+	}
+}
+
+// TestScrapeCycleHonorsDeadline checks that a hung endpoint can't drag a scrape cycle past
+// scrapeInterval, even when requestTimeout is much larger.
+func TestScrapeCycleHonorsDeadline(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	myConfig := &config.Config{}
+	myConfig.Ntopng.EndPoint = server.URL
+	myConfig.Ntopng.AuthMethod = testAuthMethod
+	myConfig.Ntopng.ScrapeInterval = "100ms"
+	myConfig.Ntopng.ScrapeTargets = []string{config.L7Protocols}
+	myConfig.Host.InterfacesToMonitor = []string{testIfName, "eth1"}
+
+	c := CreateController(context.Background(), myConfig, config.DefaultRequestTimeout)
+	c.ifList = map[string]int{testIfName: 1, "eth1": 2}
+
+	done := make(chan struct{})
+	go func() {
+		c.ScrapeAllConfiguredTargets()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("scrape cycle was not bounded by the per-cycle deadline")
 	}
 }
