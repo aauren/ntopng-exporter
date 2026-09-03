@@ -1,18 +1,23 @@
 package ntopng
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/aauren/ntopng-exporter/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-const testHostIP = "192.168.1.10"
+const (
+	testAuthMethod = "none"
+	testHostIP     = "192.168.1.10"
+)
 
 // TestHostKeyDistinguishesDimensions guards the cache key contract: IP, interface, and
 // VLAN are independent dimensions, so the same IP seen on different interfaces or VLANs
@@ -102,9 +107,11 @@ func TestScrapeHostEndpointKeepsHostPerInterfaceAndVLAN(t *testing.T) {
 	}))
 	defer server.Close()
 
-	c := CreateController(&config.Config{}, nil)
+	requestTimeout := 2 * time.Second
+	c := CreateController(context.Background(), &config.Config{}, requestTimeout)
+	assert.Equal(t, requestTimeout, c.httpClient.Timeout)
 	c.config.Ntopng.EndPoint = server.URL
-	c.config.Ntopng.AuthMethod = "none"
+	c.config.Ntopng.AuthMethod = testAuthMethod
 	c.ifList = map[string]int{localIfName: localIfID, vlanIfName: vlanIfID}
 
 	hosts := make(map[hostKey]ntopHost)
@@ -143,9 +150,9 @@ func TestScrapeL7ProtocolEndpoint(t *testing.T) {
 	}))
 	defer server.Close()
 
-	c := CreateController(&config.Config{}, nil)
+	c := CreateController(context.Background(), &config.Config{}, config.DefaultRequestTimeout)
 	c.config.Ntopng.EndPoint = server.URL
-	c.config.Ntopng.AuthMethod = "none"
+	c.config.Ntopng.AuthMethod = testAuthMethod
 	c.ifList = map[string]int{"eth0": 1}
 	protocols := make(map[string]ntopL7Protocol)
 
@@ -156,4 +163,39 @@ func TestScrapeL7ProtocolEndpoint(t *testing.T) {
 	assert.Equal(t, 100.0, protocol.Bytes.Received)
 	assert.Equal(t, 15.0, protocol.Packets.Total)
 	assert.Equal(t, 2.0, protocol.Flows)
+}
+
+func TestScrapeL7ProtocolEndpointHonorsControllerContext(t *testing.T) {
+	t.Parallel()
+	requestStarted := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		close(requestStarted)
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	c := CreateController(ctx, &config.Config{}, config.DefaultRequestTimeout)
+	c.config.Ntopng.EndPoint = server.URL
+	c.config.Ntopng.AuthMethod = testAuthMethod
+	c.ifList = map[string]int{"eth0": 1}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- c.scrapeL7ProtocolEndpoint(1, make(map[string]ntopL7Protocol))
+	}()
+
+	select {
+	case <-requestStarted:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for the L7 request to start")
+	}
+	cancel()
+
+	select {
+	case err := <-errCh:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		t.Fatal("L7 request did not stop after canceling the controller context")
+	}
 }

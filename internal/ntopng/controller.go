@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -29,18 +30,20 @@ const (
 
 type Controller struct {
 	config         *config.Config
+	ctx            context.Context
+	httpClient     *http.Client
 	ifList         map[string]int
 	HostList       map[hostKey]ntopHost
 	InterfaceList  map[string]ntopInterfaceFull
 	L7ProtocolList map[string]ntopL7Protocol
 	ListRWMutex    *sync.RWMutex
-	stopChan       <-chan struct{}
 }
 
-func CreateController(config *config.Config, stopChan <-chan struct{}) Controller {
+func CreateController(ctx context.Context, myConfig *config.Config, requestTimeout time.Duration) Controller {
 	var controller Controller
-	controller.config = config
-	controller.stopChan = stopChan
+	controller.config = myConfig
+	controller.ctx = ctx
+	controller.httpClient = getHttpClient(myConfig.Ntopng.AllowUnsafeTLS, requestTimeout)
 	controller.ListRWMutex = &sync.RWMutex{}
 	return controller
 }
@@ -52,12 +55,13 @@ func (c *Controller) RunController() {
 		return
 	}
 	ticker := time.NewTicker(scrapeInterval)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			fmt.Printf("scrap interval hit: scraping from ntop\n")
+			fmt.Printf("scrape interval hit: scraping from ntop\n")
 			c.ScrapeAllConfiguredTargets()
-		case <-c.stopChan:
+		case <-c.ctx.Done():
 			return
 		}
 	}
@@ -80,13 +84,16 @@ func (c *Controller) ScrapeAllConfiguredTargets() {
 
 func (c *Controller) CacheInterfaceIds() error {
 	endpoint := fmt.Sprintf("%s%s%s", c.config.Ntopng.EndPoint, luaRestV2Get, interfaceListPath)
-	req, err := http.NewRequestWithContext(context.Background(), "GET", endpoint, nil)
+	req, err := http.NewRequestWithContext(c.ctx, "GET", endpoint, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get response from ntopng interface endpoint: %v", err)
 	}
 	c.setCommonOptions(req, false)
 
-	body, status, _ := getHttpResponseBody(getHttpClient(c.config.Ntopng.AllowUnsafeTLS), req)
+	body, status, err := getHttpResponseBody(c.httpClient, req)
+	if err != nil {
+		return fmt.Errorf("request to interface endpoint: %w", err)
+	}
 	if status != http.StatusOK {
 		if body != nil {
 			return fmt.Errorf("request to interface endpoint was not successful. Status: '%d', Response: '%v'",
@@ -129,7 +136,8 @@ func (c *Controller) ScrapeHostEndpointForAllInterfaces() {
 	// don't keep a list of ever growing hosts in our map which could eventually overwhelm the system
 	tempNtopHosts := make(map[hostKey]ntopHost)
 	for _, configuredIf := range c.config.Host.InterfacesToMonitor {
-		if err := c.scrapeHostEndpoint(c.ifList[configuredIf], tempNtopHosts); err != nil {
+		// We stay quiet on context.Canceled because it just means we're shutting down mid-scrape
+		if err := c.scrapeHostEndpoint(c.ifList[configuredIf], tempNtopHosts); err != nil && !errors.Is(err, context.Canceled) {
 			fmt.Printf("failed to scrape interface '%s' with error: %v", configuredIf, err)
 		}
 	}
@@ -141,13 +149,16 @@ func (c *Controller) ScrapeHostEndpointForAllInterfaces() {
 func (c *Controller) scrapeHostEndpoint(interfaceId int, tempNtopHosts map[hostKey]ntopHost) error {
 	endpoint := fmt.Sprintf("%s%s%s", c.config.Ntopng.EndPoint, luaRestV2Get, hostCustomPath)
 	payload := []byte(fmt.Sprintf(`{"ifid": %d, "field_alias": "%s"}`, interfaceId, hostCustomFields))
-	req, err := http.NewRequestWithContext(context.Background(), "POST", endpoint, bytes.NewBuffer(payload))
+	req, err := http.NewRequestWithContext(c.ctx, "POST", endpoint, bytes.NewBuffer(payload))
 	if err != nil {
 		return err
 	}
 	c.setCommonOptions(req, true)
 
-	body, status, _ := getHttpResponseBody(getHttpClient(c.config.Ntopng.AllowUnsafeTLS), req)
+	body, status, err := getHttpResponseBody(c.httpClient, req)
+	if err != nil {
+		return fmt.Errorf("request to host endpoint: %w", err)
+	}
 	if status != http.StatusOK {
 		if body != nil {
 			return fmt.Errorf("request to host endpoint was not successful. Status: '%d', Response: '%v'",
@@ -202,7 +213,8 @@ func (c *Controller) ScrapeInterfaceEndpointForAllInterfaces() {
 	// don't keep a list of ever growing hosts in our map which could eventually overwhelm the system
 	tempNtopInterfaces := make(map[string]ntopInterfaceFull)
 	for _, configuredIf := range c.config.Host.InterfacesToMonitor {
-		if err := c.scrapeInterfaceEndpoint(c.ifList[configuredIf], tempNtopInterfaces); err != nil {
+		// We stay quiet on context.Canceled because it just means we're shutting down mid-scrape
+		if err := c.scrapeInterfaceEndpoint(c.ifList[configuredIf], tempNtopInterfaces); err != nil && !errors.Is(err, context.Canceled) {
 			fmt.Printf("failed to scrape interface '%s' with error: %v", configuredIf, err)
 		}
 	}
@@ -214,13 +226,16 @@ func (c *Controller) ScrapeInterfaceEndpointForAllInterfaces() {
 func (c *Controller) scrapeInterfaceEndpoint(interfaceId int, tempInterfaces map[string]ntopInterfaceFull) error {
 	endpoint := fmt.Sprintf("%s%s%s?ifid=%d",
 		c.config.Ntopng.EndPoint, luaRestV2Get, interfaceDataPath, interfaceId)
-	req, err := http.NewRequestWithContext(context.Background(), "GET", endpoint, nil)
+	req, err := http.NewRequestWithContext(c.ctx, "GET", endpoint, nil)
 	if err != nil {
 		return err
 	}
 	c.setCommonOptions(req, false)
 
-	body, status, _ := getHttpResponseBody(getHttpClient(c.config.Ntopng.AllowUnsafeTLS), req)
+	body, status, err := getHttpResponseBody(c.httpClient, req)
+	if err != nil {
+		return fmt.Errorf("request to interface data endpoint: %w", err)
+	}
 	if status != http.StatusOK {
 		if body != nil {
 			return fmt.Errorf("request to interface data endpoint was not successful. Status: '%d', Response: '%v'",
@@ -251,7 +266,8 @@ func (c *Controller) scrapeInterfaceEndpoint(interfaceId int, tempInterfaces map
 func (c *Controller) ScrapeL7ProtocolEndpointForAllInterfaces() {
 	tempL7Protocols := make(map[string]ntopL7Protocol)
 	for _, configuredIf := range c.config.Host.InterfacesToMonitor {
-		if err := c.scrapeL7ProtocolEndpoint(c.ifList[configuredIf], tempL7Protocols); err != nil {
+		// We stay quiet on context.Canceled because it just means we're shutting down mid-scrape
+		if err := c.scrapeL7ProtocolEndpoint(c.ifList[configuredIf], tempL7Protocols); err != nil && !errors.Is(err, context.Canceled) {
 			fmt.Printf("failed to scrape L7 protocols for interface '%s' with error: %v", configuredIf, err)
 		}
 	}
@@ -262,13 +278,16 @@ func (c *Controller) ScrapeL7ProtocolEndpointForAllInterfaces() {
 
 func (c *Controller) scrapeL7ProtocolEndpoint(interfaceId int, tempL7Protocols map[string]ntopL7Protocol) error {
 	endpoint := fmt.Sprintf("%s%s%s?ifid=%d", c.config.Ntopng.EndPoint, luaRestV2Get, l7DataPath, interfaceId)
-	req, err := http.NewRequestWithContext(context.Background(), "GET", endpoint, nil)
+	req, err := http.NewRequestWithContext(c.ctx, "GET", endpoint, nil)
 	if err != nil {
 		return err
 	}
 	c.setCommonOptions(req, false)
 
-	body, status, _ := getHttpResponseBody(getHttpClient(c.config.Ntopng.AllowUnsafeTLS), req)
+	body, status, err := getHttpResponseBody(c.httpClient, req)
+	if err != nil {
+		return fmt.Errorf("request to L7 protocol endpoint: %w", err)
+	}
 	if status != http.StatusOK {
 		if body != nil {
 			return fmt.Errorf("request to L7 protocol endpoint was not successful. Status: '%d', Response: '%v'",
@@ -313,11 +332,11 @@ func (c *Controller) setCommonOptions(req *http.Request, isJsonRequest bool) {
 	}
 }
 
-func getHttpClient(allowInsecure bool) *http.Client {
+func getHttpClient(allowInsecure bool, requestTimeout time.Duration) *http.Client {
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 	if allowInsecure {
 		// #nosec G402 -- InsecureSkipVerify is intentionally configurable via AllowUnsafeTLS setting
 		customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
-	return &http.Client{Transport: customTransport}
+	return &http.Client{Transport: customTransport, Timeout: requestTimeout}
 }

@@ -16,6 +16,7 @@ const (
 	InterfaceScrape        = "interfaces"
 	L7Protocols            = "l7protocols"
 	DefaultMetricServePort = 3001
+	DefaultRequestTimeout  = 30 * time.Second
 )
 
 var (
@@ -33,6 +34,7 @@ type ntopng struct {
 	Token          string
 	AuthMethod     string
 	ScrapeInterval string
+	RequestTimeout string
 	ScrapeTargets  []string
 	AllowUnsafeTLS bool
 }
@@ -75,6 +77,9 @@ func ParseConfig() (Config, error) {
 	// Set default values
 	viper.SetDefault("metric.excludeDNSMetrics", false)
 	viper.SetDefault("ntopng.scrapeInterval", "1m")
+	// We have to register the scrapeInterval default before GetDuration so that it can fall back to it, an
+	// unparsable user value comes back as 0 here and gets rejected properly by validate() later on
+	viper.SetDefault("ntopng.requestTimeout", defaultRequestTimeout(viper.GetDuration("ntopng.scrapeInterval")).String())
 	viper.SetDefault("ntopng.metric.serve.ip", "0.0.0.0")
 	viper.SetDefault("ntopng.metric.serve.port", DefaultMetricServePort)
 	viper.SetDefault("ntopng.scrapeTargets", "all")
@@ -91,6 +96,15 @@ func ParseConfig() (Config, error) {
 	}
 	err = config.validate()
 	return config, err
+}
+
+// defaultRequestTimeout caps the default at the scrape interval so that short-interval configs don't fail
+// validation out of the box, ignoring non-positive intervals which validate() rejects with a better message
+func defaultRequestTimeout(scrapeInterval time.Duration) time.Duration {
+	if scrapeInterval > 0 {
+		return min(DefaultRequestTimeout, scrapeInterval)
+	}
+	return DefaultRequestTimeout
 }
 
 func (c *Config) validate() error {
@@ -122,8 +136,26 @@ func (c *Config) validate() error {
 			}
 		}
 	}
-	if _, err := time.ParseDuration(c.Ntopng.ScrapeInterval); err != nil {
+	scrapeInterval, err := time.ParseDuration(c.Ntopng.ScrapeInterval)
+	if err != nil {
 		return fmt.Errorf("was not able to parse configured duration: %s - %v", c.Ntopng.ScrapeInterval, err)
+	}
+	if scrapeInterval <= 0 {
+		return fmt.Errorf("ntopng scrapeInterval must be greater than zero")
+	}
+	requestTimeout, err := time.ParseDuration(c.Ntopng.RequestTimeout)
+	if err != nil {
+		return fmt.Errorf("was not able to parse configured request timeout: %s - %v", c.Ntopng.RequestTimeout, err)
+	}
+	if requestTimeout <= 0 {
+		return fmt.Errorf("ntopng requestTimeout must be greater than zero")
+	}
+	if requestTimeout > scrapeInterval {
+		// We clamp rather than error so that a config tuned for a slow ntopng keeps working
+		// when someone later shortens the scrape interval
+		fmt.Printf("ntopng requestTimeout (%s) is greater than scrapeInterval (%s), clamping requestTimeout to %s\n",
+			c.Ntopng.RequestTimeout, c.Ntopng.ScrapeInterval, scrapeInterval)
+		c.Ntopng.RequestTimeout = scrapeInterval.String()
 	}
 	if c.Metric.Serve.IP != "0.0.0.0" {
 		addrs, err := net.InterfaceAddrs()
@@ -158,8 +190,8 @@ func (c Config) String() string {
 }
 
 func (n ntopng) String() string {
-	return fmt.Sprintf("\t%s: '%s'/*HIDDEN* - %s - Allow Unsafe TLS? %t\n\tScrape Interval: %s\n\tScrape Targets: %s",
-		n.EndPoint, n.User, n.AuthMethod, n.AllowUnsafeTLS, n.ScrapeInterval, n.ScrapeTargets)
+	return fmt.Sprintf("\t%s: '%s'/*HIDDEN* - %s - Allow Unsafe TLS? %t\n\tScrape Interval: %s\n\tRequest Timeout: %s\n\tScrape Targets: %s",
+		n.EndPoint, n.User, n.AuthMethod, n.AllowUnsafeTLS, n.ScrapeInterval, n.RequestTimeout, n.ScrapeTargets)
 }
 
 func (h host) String() string {

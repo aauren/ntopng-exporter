@@ -26,11 +26,17 @@ func main() {
 	}
 	fmt.Printf("Config: %s\n\n", myConfig)
 
-	// Setup channel for stopping work when done
-	stopChan := make(chan struct{})
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+
+	// ParseConfig has already validated this, so a failure here means a programming error on our side
+	requestTimeout, err := time.ParseDuration(myConfig.Ntopng.RequestTimeout)
+	if err != nil {
+		fmt.Printf("failed to parse request timeout '%s': %v\n", myConfig.Ntopng.RequestTimeout, err)
+		os.Exit(3)
+	}
 
 	// Setup ntopng scrape controller and prime cache, then start it running asynchronously
-	ntopControl := ntopng.CreateController(&myConfig, stopChan)
+	ntopControl := ntopng.CreateController(ctx, &myConfig, requestTimeout)
 	err = ntopControl.CacheInterfaceIds()
 	if err != nil {
 		fmt.Printf("failed to cache interface ids: %v\n", err)
@@ -41,18 +47,16 @@ func main() {
 
 	// Setup goroutine for serving traffic
 	srv := serveMetrics(&ntopControl, &myConfig)
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	<-c
+	<-ctx.Done()
+	stop()
 
 	fmt.Printf("\n\nDetected shutdown - Cleaning Up Now\n\n")
-	close(stopChan)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer func() {
 		cancel()
 	}()
-	if err := srv.Shutdown(ctx); err != nil {
+	if err := srv.Shutdown(shutdownCtx); err != nil {
 		fmt.Printf("Was unable to gracefully shutdown prometheus http server: %v\n", err)
 	}
 	fmt.Printf("\nGoodbye")
