@@ -163,6 +163,11 @@ Currently, the only supported metric system is Prometheus, however, the design s
 systems. There are [examples](/docs/ntopng_exporter_example_metrics.md) of the Prometheus metrics emitted in the docs
 section of this repo.
 
+Alongside the network metrics, ntopng-exporter emits `ntopng_request_duration_seconds` and
+`ntopng_request_errors_total` so that you can see how ntopng itself is holding up. Both are labeled per interface and
+per request type, so if one interface's host scrape is what's dragging your scrape cycle out, or if requests are
+quietly timing out, you'll be able to see exactly which ones.
+
 ## Grafana Dashboard
 
 There is an example Grafana dashboard that user's can use contained within this repository at [grafana-dashboard.json](/resources/grafana-dashboard.json)

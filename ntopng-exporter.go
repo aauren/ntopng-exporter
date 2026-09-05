@@ -63,6 +63,8 @@ func main() {
 }
 
 func serveMetrics(ntopController *ntopng.Controller, myConfig *config.Config) *http.Server {
+	// Request timing and error counts aren't tied to any one scrape target, so they're always on
+	prometheus.MustRegister(ntopController.Collectors()...)
 	if internal.IsItemInArray(myConfig.Ntopng.ScrapeTargets, config.HostScrape) ||
 		internal.IsItemInArray(myConfig.Ntopng.ScrapeTargets, config.AllScrape) {
 		ntopCollector := ntopPrometheus.NewNtopNGHostCollector(ntopController, myConfig)

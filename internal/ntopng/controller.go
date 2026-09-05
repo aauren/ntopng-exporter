@@ -36,6 +36,7 @@ type Controller struct {
 	ctx            context.Context
 	httpClient     *http.Client
 	ifList         map[string]int
+	requestMetrics *requestMetrics
 	HostList       map[hostKey]ntopHost
 	InterfaceList  map[string]ntopInterfaceFull
 	L7ProtocolList map[string]ntopL7Protocol
@@ -47,6 +48,7 @@ func CreateController(ctx context.Context, myConfig *config.Config, requestTimeo
 	controller.config = myConfig
 	controller.ctx = ctx
 	controller.httpClient = getHttpClient(myConfig.Ntopng.AllowUnsafeTLS, requestTimeout)
+	controller.requestMetrics = newRequestMetrics()
 	controller.ListRWMutex = &sync.RWMutex{}
 	return controller
 }
@@ -126,32 +128,20 @@ func (c *Controller) CacheInterfaceIds() error {
 	}
 	c.setCommonOptions(req, false)
 
-	body, status, err := getHttpResponseBody(c.httpClient, req)
+	// We have no interface name to label with yet, which is the whole point of this call, so the
+	// ifname label stays empty for it
+	rawInterfaces, err := c.getNtopData(req, interfaceListTarget, "")
 	if err != nil {
-		return fmt.Errorf("request to interface endpoint: %w", err)
-	}
-	if status != http.StatusOK {
-		if body != nil {
-			return fmt.Errorf("request to interface endpoint was not successful. Status: '%d', Response: '%v'",
-				status, *body)
-		} else {
-			return fmt.Errorf("request to interface endpoint was not successful. Status: '%d'",
-				status)
-		}
-	}
-
-	rawInterfaces, err := getRawJsonFromNtopResponse(body)
-	if err != nil {
-		fmt.Printf("Received the following HTTP body response when we were expecting JSON: \n%s\n", body)
-		return fmt.Errorf("failed to parse JSON from HTTP body: %v", err)
+		return err
 	}
 	var ifList []ntopInterface
-	err = json.Unmarshal(rawInterfaces, &ifList)
-	if err != nil {
+	if err = json.Unmarshal(rawInterfaces, &ifList); err != nil {
+		c.requestMetrics.countError(interfaceListTarget, "", reasonParse)
 		return fmt.Errorf("was not able to parse interface list from ntopng: %v", err)
 	}
 	if len(ifList) < 1 {
-		return fmt.Errorf("ntopng returned 0 interfaces: %v", *body)
+		c.requestMetrics.countError(interfaceListTarget, "", reasonEmpty)
+		return fmt.Errorf("ntopng returned 0 interfaces")
 	}
 	c.ifList = make(map[string]int, len(ifList))
 	for _, myIf := range ifList {
@@ -202,6 +192,7 @@ func queueScrapes[K comparable, V any](ctx context.Context, c *Controller, group
 }
 
 func (c *Controller) scrapeHostEndpoint(ctx context.Context, interfaceId int, tempNtopHosts map[hostKey]ntopHost) error {
+	ifName := c.resolveIfNameOrID(interfaceId)
 	endpoint := fmt.Sprintf("%s%s%s", c.config.Ntopng.EndPoint, luaRestV2Get, hostCustomPath)
 	payload := []byte(fmt.Sprintf(`{"ifid": %d, "field_alias": "%s"}`, interfaceId, hostCustomFields))
 	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(payload))
@@ -210,28 +201,22 @@ func (c *Controller) scrapeHostEndpoint(ctx context.Context, interfaceId int, te
 	}
 	c.setCommonOptions(req, true)
 
-	body, status, err := getHttpResponseBody(c.httpClient, req)
-	if err != nil {
-		return fmt.Errorf("request to host endpoint: %w", err)
-	}
-	if status != http.StatusOK {
-		if body != nil {
-			return fmt.Errorf("request to host endpoint was not successful. Status: '%d', Response: '%v'",
-				status, *body)
-		} else {
-			return fmt.Errorf("request to host endpoint was not successful. Status: '%d'",
-				status)
-		}
-	}
-
-	rawHosts, err := getRawJsonFromNtopResponse(body)
+	rawHosts, err := c.getNtopData(req, config.HostScrape, ifName)
 	if err != nil {
 		return err
 	}
 	var hostList []ntopHost
-	_ = json.Unmarshal(rawHosts, &hostList)
+	if err = json.Unmarshal(rawHosts, &hostList); err != nil {
+		// We'd rather keep whatever hosts did decode than throw the whole interface away over one bad
+		// field, so we only count this instead of bailing out the way the other endpoints do
+		c.requestMetrics.countError(config.HostScrape, ifName, reasonParse)
+		if len(hostList) == 0 {
+			return fmt.Errorf("was not able to parse hosts from ntopng: %w", err)
+		}
+	}
 	if len(hostList) < 1 {
-		return fmt.Errorf("ntopng returned 0 hosts: %v", *body)
+		c.requestMetrics.countError(config.HostScrape, ifName, reasonEmpty)
+		return fmt.Errorf("ntopng returned 0 hosts")
 	}
 	var parsedSubnets []*net.IPNet
 	if len(c.config.Metric.LocalSubnetsOnly) > 0 {
@@ -264,6 +249,7 @@ func (c *Controller) scrapeHostEndpoint(ctx context.Context, interfaceId int, te
 }
 
 func (c *Controller) scrapeInterfaceEndpoint(ctx context.Context, interfaceId int, tempInterfaces map[string]ntopInterfaceFull) error {
+	ifName := c.resolveIfNameOrID(interfaceId)
 	endpoint := fmt.Sprintf("%s%s%s?ifid=%d",
 		c.config.Ntopng.EndPoint, luaRestV2Get, interfaceDataPath, interfaceId)
 	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
@@ -272,38 +258,21 @@ func (c *Controller) scrapeInterfaceEndpoint(ctx context.Context, interfaceId in
 	}
 	c.setCommonOptions(req, false)
 
-	body, status, err := getHttpResponseBody(c.httpClient, req)
-	if err != nil {
-		return fmt.Errorf("request to interface data endpoint: %w", err)
-	}
-	if status != http.StatusOK {
-		if body != nil {
-			return fmt.Errorf("request to interface data endpoint was not successful. Status: '%d', Response: '%v'",
-				status, *body)
-		} else {
-			return fmt.Errorf("request to interface data endpoint was not successful. Status: '%d'",
-				status)
-		}
-	}
-
-	rawInterface, err := getRawJsonFromNtopResponse(body)
+	rawInterface, err := c.getNtopData(req, config.InterfaceScrape, ifName)
 	if err != nil {
 		return err
 	}
 	var ifFull ntopInterfaceFull
-	err = json.Unmarshal(rawInterface, &ifFull)
-	if err != nil {
-		if ifName, err := c.ResolveIfID(interfaceId); err != nil {
-			return fmt.Errorf("problem parsing ntop interface: %s - %v", ifName, err)
-		} else {
-			return fmt.Errorf("problem parsing ntop interface: %d - %v", interfaceId, err)
-		}
+	if err = json.Unmarshal(rawInterface, &ifFull); err != nil {
+		c.requestMetrics.countError(config.InterfaceScrape, ifName, reasonParse)
+		return fmt.Errorf("problem parsing ntop interface: %s - %v", ifName, err)
 	}
 	tempInterfaces[ifFull.IfName] = ifFull
 	return nil
 }
 
 func (c *Controller) scrapeL7ProtocolEndpoint(ctx context.Context, interfaceId int, tempL7Protocols map[string]ntopL7Protocol) error {
+	ifName := c.resolveIfNameOrID(interfaceId)
 	endpoint := fmt.Sprintf("%s%s%s?ifid=%d", c.config.Ntopng.EndPoint, luaRestV2Get, l7DataPath, interfaceId)
 	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	if err != nil {
@@ -311,29 +280,14 @@ func (c *Controller) scrapeL7ProtocolEndpoint(ctx context.Context, interfaceId i
 	}
 	c.setCommonOptions(req, false)
 
-	body, status, err := getHttpResponseBody(c.httpClient, req)
-	if err != nil {
-		return fmt.Errorf("request to L7 protocol endpoint: %w", err)
-	}
-	if status != http.StatusOK {
-		if body != nil {
-			return fmt.Errorf("request to L7 protocol endpoint was not successful. Status: '%d', Response: '%v'",
-				status, *body)
-		}
-		return fmt.Errorf("request to L7 protocol endpoint was not successful. Status: '%d'", status)
-	}
-
-	rawProtocols, err := getRawJsonFromNtopResponse(body)
+	rawProtocols, err := c.getNtopData(req, config.L7Protocols, ifName)
 	if err != nil {
 		return err
 	}
 	var protocols []ntopL7Protocol
 	if err := json.Unmarshal(rawProtocols, &protocols); err != nil {
+		c.requestMetrics.countError(config.L7Protocols, ifName, reasonParse)
 		return fmt.Errorf("was not able to parse L7 protocols from ntopng: %v", err)
-	}
-	ifName, err := c.ResolveIfID(interfaceId)
-	if err != nil {
-		return fmt.Errorf("could not resolve interface: %d: %v", interfaceId, err)
 	}
 	for _, protocol := range protocols {
 		protocol.IfID = interfaceId
@@ -357,6 +311,34 @@ func (c *Controller) setCommonOptions(req *http.Request, isJsonRequest bool) {
 	case "token":
 		req.Header.Add("Authorization", fmt.Sprintf("Token %s", c.config.Ntopng.Token))
 	}
+}
+
+// getNtopData is the single choke point every ntopng API call goes through for timing, error
+// counting, and envelope unwrapping. It only returns a payload on a 200 OK envelope.
+func (c *Controller) getNtopData(req *http.Request, target, ifName string) (json.RawMessage, error) {
+	// A scrape queued behind a slow one can find the cycle already over before a worker frees up. We
+	// count that but skip sending, so a request that never left the machine doesn't skew the latency histogram.
+	if ctxErr := req.Context().Err(); ctxErr != nil {
+		c.requestMetrics.countError(target, ifName, classifyError(ctxErr, ctxErr))
+		return nil, fmt.Errorf("abandoned %s request before sending it: %w", target, ctxErr)
+	}
+
+	start := time.Now()
+	body, status, err := getHttpResponseBody(c.httpClient, req)
+	if err == nil && status != http.StatusOK {
+		err = fmt.Errorf("%w: '%d'%s", errUnexpectedStatus, status, responseSuffix(body))
+	}
+	c.requestMetrics.observe(target, ifName, time.Since(start), err, req.Context().Err())
+	if err != nil {
+		return nil, fmt.Errorf("request to %s endpoint: %w", target, err)
+	}
+
+	raw, err := getRawJsonFromNtopResponse(body)
+	if err != nil {
+		c.requestMetrics.countError(target, ifName, reasonParse)
+		return nil, fmt.Errorf("failed to parse %s response from ntopng: %v%s", target, err, responseSuffix(body))
+	}
+	return raw, nil
 }
 
 func getHttpClient(allowInsecure bool, requestTimeout time.Duration) *http.Client {

@@ -8,6 +8,11 @@ All metrics having to do with ntopng are prefixed with `ntopng_`. These are the 
 - `ntopng_host_` metrics - These metrics are all labeled with the IP, MAC address, interface name, interface ID, and name of the host (if ntopng can find it). They indicate metrics that are specific to individual hosts on a given interface.
 - `ntopng_l7_` metrics - These metrics are labeled with the interface, application protocol, application ID, and
 	protocol breed. They indicate traffic statistics for each application protocol on an interface.
+- `ntopng_request_` metrics - These metrics describe how ntopng-exporter's own requests to ntopng are going, rather than the network that ntopng is watching. They're labeled with the interface (`ifname`) and the kind of request (`target`), where the target values are the same ones you'd put under `scrapeTargets` in your config, plus `interfacelist` for the interface lookup that happens at startup and isn't tied to any one interface.
+	- `ntopng_request_duration_seconds` is a histogram of how long ntopng took to answer, timed from the moment we send the request to the moment we finish reading the response body. Failed requests are timed too, which means the `_count` is an honest count of every request we actually sent, and a timeout shows up as an observation at roughly your configured `requestTimeout`. The one thing that doesn't get timed is a request we abandoned before sending it, because the scrape cycle ran out of time while it was still queued behind another interface. That has no latency to report and counting it as zero would drag the numbers down exactly when things are going worst.
+	- `ntopng_request_errors_total` counts requests that didn't work out, broken down further by a `reason` label: `timeout` for a single request that ran past `requestTimeout`, `deadline` for a request cut short (or never sent at all) because the whole scrape cycle ran past `scrapeInterval`, `canceled` for a request cut short by shutdown, `http_status` for a non-200 from ntopng, `parse` for a response we couldn't make sense of, `empty` for a well formed response that came back with nothing in it, and `request` for everything else (connection refused, DNS failures, TLS problems and the like).
+
+	The split between `timeout` and `deadline` is worth paying attention to, because they point at different fixes. A `timeout` says one request to ntopng is slower than `requestTimeout` allows. A `deadline` says the cycle as a whole can't get through every interface and target within `scrapeInterval`, which you'd address by raising `scrapeInterval`, raising `parallelWorkers`, or scraping fewer targets.
 
 ```
 # HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.
@@ -201,6 +206,12 @@ All metrics having to do with ntopng are prefixed with `ntopng_`. These are the 
 
 # HELP ntopng_l7_flows total number of flows by application protocol
 # TYPE ntopng_l7_flows gauge
+
+# HELP ntopng_request_duration_seconds time ntopng took to answer a request, by interface and request type
+# TYPE ntopng_request_duration_seconds histogram
+
+# HELP ntopng_request_errors_total requests to ntopng that timed out or otherwise failed, by interface, request type, and reason
+# TYPE ntopng_request_errors_total counter
 
 # HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
 # TYPE process_cpu_seconds_total counter

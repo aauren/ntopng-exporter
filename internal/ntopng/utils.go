@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 )
+
+const maxLoggedResponse = 512
 
 func getHttpResponseBody(client *http.Client, req *http.Request) (*[]byte, int, error) {
 	var body []byte
@@ -15,7 +18,10 @@ func getHttpResponseBody(client *http.Client, req *http.Request) (*[]byte, int, 
 	}
 	defer resp.Body.Close()
 
-	body, _ = io.ReadAll(resp.Body)
+	body, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return &body, resp.StatusCode, fmt.Errorf("reading response body: %w", err)
+	}
 	return &body, resp.StatusCode, nil
 }
 
@@ -41,4 +47,25 @@ func (c *Controller) ResolveIfID(inputIfID int) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("could not find an interface name for ifid: %d", inputIfID)
+}
+
+// resolveIfNameOrID falls back to the numeric id so that an interface we can't name still gives us a
+// usable metric label rather than an empty one
+func (c *Controller) resolveIfNameOrID(inputIfID int) string {
+	if ifName, err := c.ResolveIfID(inputIfID); err == nil {
+		return ifName
+	}
+	return strconv.Itoa(inputIfID)
+}
+
+// responseSuffix appends ntopng's response to an error for debugging, truncated because a host list
+// response can run to megabytes and we don't want that landing in the log on every failed scrape.
+func responseSuffix(body *[]byte) string {
+	if body == nil || len(*body) == 0 {
+		return ""
+	}
+	if len(*body) > maxLoggedResponse {
+		return fmt.Sprintf(", response: '%s' (truncated)", (*body)[:maxLoggedResponse])
+	}
+	return fmt.Sprintf(", response: '%s'", *body)
 }
