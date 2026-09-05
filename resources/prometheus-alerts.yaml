@@ -1,0 +1,196 @@
+# Example Prometheus alerting rules for ntopng-exporter.
+#
+# These are a starting point, not gospel. The thresholds below are tuned for a
+# home or small office setup where ntopng-exporter polls a handful of
+# interfaces, so you'll want to adjust them to match your own scrapeInterval,
+# requestTimeout, and how noisy you're willing to let things get.
+#
+# Load them with something like the following in your prometheus.yml:
+#
+#   rule_files:
+#     - /etc/prometheus/rules/ntopng-exporter.yaml
+#
+# Every alert carries an `instance` label so that they work when you scrape
+# more than one ntopng-exporter. Rules that break down by interface also carry
+# `ifname` and `target`.
+groups:
+  - name: ntopng-exporter.health
+    rules:
+      # Prometheus can't reach the exporter at all. Without this one, every
+      # other alert in this file goes quiet the moment the exporter dies, which
+      # is exactly the wrong time for it to be quiet.
+      - alert: NtopngExporterDown
+        expr: up{job=~".*ntopng.*"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ntopng-exporter on {{ $labels.instance }} is down"
+          description: >-
+            Prometheus hasn't been able to scrape ntopng-exporter at
+            {{ $labels.instance }} for 5 minutes. Check that the service is
+            running and that the metric port is reachable.
+
+      # The exporter is up but hasn't been able to get anything out of ntopng
+      # for a while. This catches ntopng being down, wrong credentials, and
+      # a bad endpoint URL, all of which show up as a 100% error ratio.
+      - alert: NtopngUnreachable
+        expr: |
+          (
+            sum by (instance) (rate(ntopng_request_errors_total[5m]))
+            /
+            sum by (instance) (rate(ntopng_request_duration_seconds_count[5m]))
+          ) >= 0.95
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ntopng-exporter on {{ $labels.instance }} can't talk to ntopng"
+          description: >-
+            Nearly every request from {{ $labels.instance }} to ntopng has
+            failed for the last 5 minutes. Check that ntopng is running, that
+            the endpoint in the exporter config is right, and that the
+            credentials or token are still valid.
+
+  - name: ntopng-exporter.requests
+    rules:
+      # A meaningful share of requests are failing but not all of them. Usually
+      # one interface or target is the culprit, so the per-interface panel on
+      # the Grafana dashboard is the next place to look.
+      - alert: NtopngRequestErrorRatioHigh
+        expr: |
+          (
+            sum by (instance) (rate(ntopng_request_errors_total[10m]))
+            /
+            sum by (instance) (rate(ntopng_request_duration_seconds_count[10m]))
+          ) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "More than 10% of ntopng requests from {{ $labels.instance }} are failing"
+          description: >-
+            {{ $value | humanizePercentage }} of requests from
+            {{ $labels.instance }} to ntopng have failed over the last 10
+            minutes. Break it down by target and reason with
+            ntopng_request_errors_total to see what's going wrong.
+
+      # Individual requests are running past requestTimeout. This is different
+      # from the deadline alert below, because the fix is either raising
+      # requestTimeout or finding out why ntopng is slow on that one interface.
+      - alert: NtopngRequestTimeouts
+        expr: |
+          sum by (instance, ifname, target) (
+            increase(ntopng_request_errors_total{reason="timeout"}[15m])
+          ) > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ntopng {{ $labels.target }} requests for {{ $labels.ifname }} are timing out"
+          description: >-
+            {{ $value | humanize }} {{ $labels.target }} requests for interface
+            {{ $labels.ifname }} on {{ $labels.instance }} ran past
+            requestTimeout in the last 15 minutes. Either raise requestTimeout
+            in the exporter config or look into why ntopng is slow to answer
+            for this interface.
+
+      # The scrape cycle as a whole is running out of scrapeInterval before it
+      # gets through every interface and target. Requests that never got sent
+      # land here too. Raising scrapeInterval, raising parallelWorkers, or
+      # scraping fewer targets are the knobs to reach for.
+      - alert: NtopngScrapeCycleOverrunning
+        expr: |
+          sum by (instance) (
+            increase(ntopng_request_errors_total{reason="deadline"}[15m])
+          ) > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ntopng-exporter on {{ $labels.instance }} can't finish a scrape cycle in time"
+          description: >-
+            {{ $value | humanize }} requests on {{ $labels.instance }} were cut
+            short or never sent in the last 15 minutes because the scrape cycle
+            ran past scrapeInterval. Raise scrapeInterval, raise
+            parallelWorkers, or drop scrape targets you don't need.
+
+      # ntopng is answering but with a non-200. This usually means auth has
+      # expired or ntopng has been upgraded to a version whose REST API has
+      # moved on from what the exporter expects.
+      - alert: NtopngUnexpectedStatus
+        expr: |
+          sum by (instance, target) (
+            increase(ntopng_request_errors_total{reason="http_status"}[15m])
+          ) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ntopng is returning non-200 responses to {{ $labels.instance }}"
+          description: >-
+            ntopng answered {{ $labels.target }} requests from
+            {{ $labels.instance }} with a non-200 status
+            {{ $value | humanize }} times in the last 15 minutes. Check the
+            exporter logs for the status code, and check that your auth method
+            and ntopng version are still what the exporter expects.
+
+      # Responses came back but the exporter couldn't make sense of them, or
+      # they were empty. A parse failure after an ntopng upgrade almost always
+      # means the API response shape changed.
+      - alert: NtopngBadResponses
+        expr: |
+          sum by (instance, target, reason) (
+            increase(ntopng_request_errors_total{reason=~"parse|empty"}[15m])
+          ) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ntopng-exporter on {{ $labels.instance }} is getting {{ $labels.reason }} responses from ntopng"
+          description: >-
+            {{ $value | humanize }} {{ $labels.target }} responses from ntopng
+            to {{ $labels.instance }} were {{ $labels.reason }} in the last 15
+            minutes. If this started after an ntopng upgrade, the REST API may
+            have changed and the exporter may need an update.
+
+  - name: ntopng-exporter.latency
+    rules:
+      # ntopng is getting slow. This fires well before the timeout alert so that
+      # you have some warning. Tune the threshold relative to requestTimeout,
+      # somewhere around half of it is a reasonable starting point.
+      - alert: NtopngRequestLatencyHigh
+        expr: |
+          histogram_quantile(0.95,
+            sum by (instance, ifname, target, le) (
+              rate(ntopng_request_duration_seconds_bucket[10m])
+            )
+          ) > 10
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ntopng {{ $labels.target }} requests for {{ $labels.ifname }} are slow"
+          description: >-
+            p95 latency for {{ $labels.target }} requests on interface
+            {{ $labels.ifname }} from {{ $labels.instance }} has been
+            {{ $value | humanizeDuration }} for 15 minutes. The hosts target on
+            a busy interface is the usual suspect, and localSubnetsOnly can
+            help cut the amount of data ntopng has to hand back.
+
+      # The exporter is up, ntopng is answering, but nothing has been scraped
+      # recently. This most often means scrapeTargets is empty or the interface
+      # list came back with nothing the exporter was configured to watch.
+      - alert: NtopngNoRequestsSent
+        expr: |
+          sum by (instance) (rate(ntopng_request_duration_seconds_count[10m])) == 0
+          and on (instance) up == 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ntopng-exporter on {{ $labels.instance }} isn't sending any requests to ntopng"
+          description: >-
+            ntopng-exporter at {{ $labels.instance }} is up but hasn't sent a
+            single request to ntopng in the last 10 minutes. Check the
+            scrapeTargets and interfaces settings in the exporter config.

@@ -173,3 +173,24 @@ quietly timing out, you'll be able to see exactly which ones.
 There is an example Grafana dashboard that user's can use contained within this repository at [grafana-dashboard.json](/resources/grafana-dashboard.json)
 
 You can also find an example of the dashboard on Grafana's public dashboard service [ntopng-exporter](https://grafana.com/grafana/dashboards/20071)
+
+The dashboard includes a "L7 Application Protocols" row that graphs the `ntopng_l7_*` metrics, breaking down traffic,
+flows, and application breed (safe, unsafe, etc.) per protocol so you can see what's actually generating traffic on
+an interface.
+
+The dashboard also includes an "Exporter Health" row at the bottom that graphs the `ntopng_request_*` metrics
+described above, so you can see request latency and failures per interface and per target without leaving the
+dashboard.
+
+## Prometheus Alerts
+
+There is also a set of example Prometheus alerting rules at [prometheus-alerts.yaml](/resources/prometheus-alerts.yaml)
+that cover the exporter being down, ntopng being unreachable, requests timing out, scrape cycles overrunning
+`scrapeInterval`, and ntopng handing back bad responses. The thresholds are tuned for a small setup, so you'll want to
+adjust them to match your own `scrapeInterval` and `requestTimeout` before relying on them. Load them with something
+like the following in your `prometheus.yml`:
+
+```yaml
+rule_files:
+  - /etc/prometheus/rules/ntopng-exporter.yaml
+```
