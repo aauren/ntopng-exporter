@@ -311,6 +311,7 @@ Currently allowed dependencies:
 - `github.com/aauren/ntopng-exporter/*` (internal packages)
 - `github.com/prometheus/client_golang`
 - `github.com/spf13/viper`
+- `golang.org/x/sync`
 
 To add a new dependency:
 

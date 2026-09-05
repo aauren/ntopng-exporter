@@ -17,6 +17,7 @@ const (
 	L7Protocols            = "l7protocols"
 	DefaultMetricServePort = 3001
 	DefaultRequestTimeout  = 30 * time.Second
+	DefaultParallelWorkers = 1
 )
 
 var (
@@ -28,15 +29,16 @@ var (
 )
 
 type ntopng struct {
-	EndPoint       string
-	User           string
-	Password       string
-	Token          string
-	AuthMethod     string
-	ScrapeInterval string
-	RequestTimeout string
-	ScrapeTargets  []string
-	AllowUnsafeTLS bool
+	EndPoint        string
+	User            string
+	Password        string
+	Token           string
+	AuthMethod      string
+	ScrapeInterval  string
+	RequestTimeout  string
+	ScrapeTargets   []string
+	AllowUnsafeTLS  bool
+	ParallelWorkers int
 }
 
 type host struct {
@@ -84,6 +86,7 @@ func ParseConfig() (Config, error) {
 	viper.SetDefault("ntopng.metric.serve.port", DefaultMetricServePort)
 	viper.SetDefault("ntopng.scrapeTargets", "all")
 	viper.SetDefault("ntopng.allowUnsafeTLS", false)
+	viper.SetDefault("ntopng.parallelWorkers", DefaultParallelWorkers)
 
 	// Unmarshal config into struct
 	err = viper.Unmarshal(&config)
@@ -157,6 +160,9 @@ func (c *Config) validate() error {
 			c.Ntopng.RequestTimeout, c.Ntopng.ScrapeInterval, scrapeInterval)
 		c.Ntopng.RequestTimeout = scrapeInterval.String()
 	}
+	if c.Ntopng.ParallelWorkers < 1 {
+		return fmt.Errorf("ntopng parallelWorkers must be at least 1, got: %d", c.Ntopng.ParallelWorkers)
+	}
 	if c.Metric.Serve.IP != "0.0.0.0" {
 		addrs, err := net.InterfaceAddrs()
 		if err != nil {
@@ -190,8 +196,11 @@ func (c Config) String() string {
 }
 
 func (n ntopng) String() string {
-	return fmt.Sprintf("\t%s: '%s'/*HIDDEN* - %s - Allow Unsafe TLS? %t\n\tScrape Interval: %s\n\tRequest Timeout: %s\n\tScrape Targets: %s",
-		n.EndPoint, n.User, n.AuthMethod, n.AllowUnsafeTLS, n.ScrapeInterval, n.RequestTimeout, n.ScrapeTargets)
+	return fmt.Sprintf(
+		"\t%s: '%s'/*HIDDEN* - %s - Allow Unsafe TLS? %t\n\tScrape Interval: %s\n\tRequest Timeout: %s"+
+			"\n\tScrape Targets: %s\n\tParallel Workers: %d",
+		n.EndPoint, n.User, n.AuthMethod, n.AllowUnsafeTLS, n.ScrapeInterval, n.RequestTimeout,
+		n.ScrapeTargets, n.ParallelWorkers)
 }
 
 func (h host) String() string {

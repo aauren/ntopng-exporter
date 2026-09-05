@@ -279,6 +279,7 @@ defer c.ListRWMutex.RUnlock()
 - `github.com/aauren/ntopng-exporter/*` (internal packages)
 - `github.com/prometheus/client_golang`
 - `github.com/spf13/viper`
+- `golang.org/x/sync`
 
 Do not add new dependencies without updating `depguard.yaml`.
 

@@ -7,11 +7,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/aauren/ntopng-exporter/internal"
 	"github.com/aauren/ntopng-exporter/internal/config"
@@ -68,27 +71,51 @@ func (c *Controller) RunController() {
 }
 
 func (c *Controller) ScrapeAllConfiguredTargets() {
-	// Because all targets and interfaces are scraped serially, requestTimeout alone can't stop a cycle from
-	// overrunning the interval, so we put a deadline on the whole cycle. ParseConfig has already validated the
-	// interval, which is why we just skip the deadline if it somehow doesn't parse here.
+	// requestTimeout alone can't stop a cycle from overrunning the interval, so we cap the whole cycle
+	// too. ParseConfig already validated it, so we skip the deadline if parsing somehow fails here.
 	cycleCtx := c.ctx
 	if scrapeInterval, err := time.ParseDuration(c.config.Ntopng.ScrapeInterval); err == nil && scrapeInterval > 0 {
 		var cancel context.CancelFunc
 		cycleCtx, cancel = context.WithTimeout(c.ctx, scrapeInterval)
 		defer cancel()
 	}
-	if internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, config.HostScrape) ||
-		internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, config.AllScrape) {
-		c.ScrapeHostEndpointForAllInterfaces(cycleCtx)
+
+	// All enabled targets share one worker pool so parallelWorkers caps concurrency globally. Results
+	// land in temp maps first, replaced wholesale, to minimize lock time and avoid unbounded growth.
+	group := c.newScrapeGroup()
+	scrapeHosts := c.isTargetEnabled(config.HostScrape)
+	scrapeInterfaces := c.isTargetEnabled(config.InterfaceScrape)
+	scrapeL7 := c.isTargetEnabled(config.L7Protocols)
+	var tempNtopHosts map[hostKey]ntopHost
+	var tempNtopInterfaces map[string]ntopInterfaceFull
+	var tempL7Protocols map[string]ntopL7Protocol
+	if scrapeHosts {
+		tempNtopHosts = queueScrapes(cycleCtx, c, group, "hosts", c.scrapeHostEndpoint)
 	}
-	if internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, config.InterfaceScrape) ||
-		internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, config.AllScrape) {
-		c.ScrapeInterfaceEndpointForAllInterfaces(cycleCtx)
+	if scrapeInterfaces {
+		tempNtopInterfaces = queueScrapes(cycleCtx, c, group, "interface data", c.scrapeInterfaceEndpoint)
 	}
-	if internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, config.L7Protocols) ||
-		internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, config.AllScrape) {
-		c.ScrapeL7ProtocolEndpointForAllInterfaces(cycleCtx)
+	if scrapeL7 {
+		tempL7Protocols = queueScrapes(cycleCtx, c, group, "L7 protocols", c.scrapeL7ProtocolEndpoint)
 	}
+	_ = group.Wait()
+
+	c.ListRWMutex.Lock()
+	defer c.ListRWMutex.Unlock()
+	if scrapeHosts {
+		c.HostList = tempNtopHosts
+	}
+	if scrapeInterfaces {
+		c.InterfaceList = tempNtopInterfaces
+	}
+	if scrapeL7 {
+		c.L7ProtocolList = tempL7Protocols
+	}
+}
+
+func (c *Controller) isTargetEnabled(target string) bool {
+	return internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, target) ||
+		internal.IsItemInArray(c.config.Ntopng.ScrapeTargets, config.AllScrape)
 }
 
 func (c *Controller) CacheInterfaceIds() error {
@@ -140,19 +167,38 @@ func (c *Controller) CacheInterfaceIds() error {
 	return nil
 }
 
-func (c *Controller) ScrapeHostEndpointForAllInterfaces(ctx context.Context) {
-	// tempNtopHosts is made here to minimize the amount of time we have to lock the list and also to make sure that we
-	// don't keep a list of ever growing hosts in our map which could eventually overwhelm the system
-	tempNtopHosts := make(map[hostKey]ntopHost)
+// newScrapeGroup builds the shared worker pool for a scrape cycle, clamped to 1 so a zero-value
+// config can't deadlock SetLimit (validate() already rejects anything below 1 from a config file).
+func (c *Controller) newScrapeGroup() *errgroup.Group {
+	var group errgroup.Group
+	group.SetLimit(max(c.config.Ntopng.ParallelWorkers, 1))
+	return &group
+}
+
+// queueScrapes submits one scrape per monitored interface onto the shared worker group. Each worker
+// fills a local map so scrapes don't need their own locking; the merged map is only safe to read after group.Wait().
+func queueScrapes[K comparable, V any](ctx context.Context, c *Controller, group *errgroup.Group, target string,
+	scrape func(ctx context.Context, interfaceId int, results map[K]V) error) map[K]V {
+	merged := make(map[K]V)
+	mergeMutex := &sync.Mutex{}
 	for _, configuredIf := range c.config.Host.InterfacesToMonitor {
-		// We stay quiet on context.Canceled because it just means we're shutting down mid-scrape
-		if err := c.scrapeHostEndpoint(ctx, c.ifList[configuredIf], tempNtopHosts); err != nil && !errors.Is(err, context.Canceled) {
-			fmt.Printf("failed to scrape interface '%s' with error: %v", configuredIf, err)
-		}
+		group.Go(func() error {
+			local := make(map[K]V)
+			if err := scrape(ctx, c.ifList[configuredIf], local); err != nil {
+				// We stay quiet on context.Canceled because it just means we're shutting down mid-scrape,
+				// and we always return nil so that one bad interface doesn't stop the others
+				if !errors.Is(err, context.Canceled) {
+					fmt.Printf("failed to scrape %s for interface '%s' with error: %v", target, configuredIf, err)
+				}
+				return nil
+			}
+			mergeMutex.Lock()
+			defer mergeMutex.Unlock()
+			maps.Copy(merged, local)
+			return nil
+		})
 	}
-	c.ListRWMutex.Lock()
-	defer c.ListRWMutex.Unlock()
-	c.HostList = tempNtopHosts
+	return merged
 }
 
 func (c *Controller) scrapeHostEndpoint(ctx context.Context, interfaceId int, tempNtopHosts map[hostKey]ntopHost) error {
@@ -217,21 +263,6 @@ func (c *Controller) scrapeHostEndpoint(ctx context.Context, interfaceId int, te
 	return nil
 }
 
-func (c *Controller) ScrapeInterfaceEndpointForAllInterfaces(ctx context.Context) {
-	// tempNtopInterfaces is made here to minimize the amount of time we have to lock the list and also to make sure that we
-	// don't keep a list of ever growing hosts in our map which could eventually overwhelm the system
-	tempNtopInterfaces := make(map[string]ntopInterfaceFull)
-	for _, configuredIf := range c.config.Host.InterfacesToMonitor {
-		// We stay quiet on context.Canceled because it just means we're shutting down mid-scrape
-		if err := c.scrapeInterfaceEndpoint(ctx, c.ifList[configuredIf], tempNtopInterfaces); err != nil && !errors.Is(err, context.Canceled) {
-			fmt.Printf("failed to scrape interface '%s' with error: %v", configuredIf, err)
-		}
-	}
-	c.ListRWMutex.Lock()
-	defer c.ListRWMutex.Unlock()
-	c.InterfaceList = tempNtopInterfaces
-}
-
 func (c *Controller) scrapeInterfaceEndpoint(ctx context.Context, interfaceId int, tempInterfaces map[string]ntopInterfaceFull) error {
 	endpoint := fmt.Sprintf("%s%s%s?ifid=%d",
 		c.config.Ntopng.EndPoint, luaRestV2Get, interfaceDataPath, interfaceId)
@@ -270,19 +301,6 @@ func (c *Controller) scrapeInterfaceEndpoint(ctx context.Context, interfaceId in
 	}
 	tempInterfaces[ifFull.IfName] = ifFull
 	return nil
-}
-
-func (c *Controller) ScrapeL7ProtocolEndpointForAllInterfaces(ctx context.Context) {
-	tempL7Protocols := make(map[string]ntopL7Protocol)
-	for _, configuredIf := range c.config.Host.InterfacesToMonitor {
-		// We stay quiet on context.Canceled because it just means we're shutting down mid-scrape
-		if err := c.scrapeL7ProtocolEndpoint(ctx, c.ifList[configuredIf], tempL7Protocols); err != nil && !errors.Is(err, context.Canceled) {
-			fmt.Printf("failed to scrape L7 protocols for interface '%s' with error: %v", configuredIf, err)
-		}
-	}
-	c.ListRWMutex.Lock()
-	defer c.ListRWMutex.Unlock()
-	c.L7ProtocolList = tempL7Protocols
 }
 
 func (c *Controller) scrapeL7ProtocolEndpoint(ctx context.Context, interfaceId int, tempL7Protocols map[string]ntopL7Protocol) error {

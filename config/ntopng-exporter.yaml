@@ -6,6 +6,7 @@ ntopng:
   authMethod: cookie # cookie, basic, token or none are accepted values
   scrapeInterval: 15s # scrape from the ntopng API every x period of time (should be synced with your prometheus scrapes) (default: 1 minute)
   requestTimeout: 15s # timeout for each ntopng API request, must be > 0, values above scrapeInterval get clamped down to it (default: 30s or scrapeInterval, whichever is shorter)
+  parallelWorkers: 1 # max concurrent requests against ntopng across all scrape targets and interfaces, raising this increases load on ntopng but can help fit more requests into a scrape interval, must be >= 1 (default: 1)
   scrapeTargets: # you can also specify "all" as a single list item to scrape all available endpoints (default: all)
   - hosts
   - interfaces

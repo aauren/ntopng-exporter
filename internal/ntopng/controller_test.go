@@ -3,9 +3,11 @@ package ntopng
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -198,6 +200,74 @@ func TestScrapeL7ProtocolEndpointHonorsControllerContext(t *testing.T) {
 		require.ErrorIs(t, err, context.Canceled)
 	case <-time.After(time.Second):
 		t.Fatal("L7 request did not stop after canceling the controller context")
+	}
+}
+
+// TestQueueScrapesParallelWorkers checks that results merge per target, concurrency never exceeds
+// the configured worker count even across shared targets, and a failing interface doesn't take the others down.
+func TestQueueScrapesParallelWorkers(t *testing.T) {
+	t.Parallel()
+	interfaces := make([]string, 8)
+	for i := range interfaces {
+		interfaces[i] = fmt.Sprintf("test-if%d", i)
+	}
+	tests := []struct {
+		name    string
+		workers int
+	}{
+		{"serial by default", 1},
+		{"parallel workers", 3},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			myConfig := &config.Config{}
+			myConfig.Ntopng.ParallelWorkers = tt.workers
+			myConfig.Host.InterfacesToMonitor = interfaces
+			c := CreateController(context.Background(), myConfig, config.DefaultRequestTimeout)
+			c.ifList = make(map[string]int, len(interfaces))
+			for i, ifName := range interfaces {
+				c.ifList[ifName] = i
+			}
+
+			var inFlight, maxInFlight atomic.Int64
+			scrape := func(_ context.Context, interfaceId int, results map[int]string) error {
+				current := inFlight.Add(1)
+				defer inFlight.Add(-1)
+				for {
+					seen := maxInFlight.Load()
+					if current <= seen || maxInFlight.CompareAndSwap(seen, current) {
+						break
+					}
+				}
+				// We sleep briefly so that workers overlap when the limit allows them to
+				time.Sleep(10 * time.Millisecond)
+				if interfaceId == 0 {
+					return fmt.Errorf("simulated scrape failure")
+				}
+				results[interfaceId] = interfaces[interfaceId]
+				return nil
+			}
+
+			// Two targets share one group, the way ScrapeAllConfiguredTargets queues them, so the
+			// worker cap must hold across both rather than per target
+			group := c.newScrapeGroup()
+			mergedFirst := queueScrapes(context.Background(), &c, group, "first target", scrape)
+			mergedSecond := queueScrapes(context.Background(), &c, group, "second target", scrape)
+			require.NoError(t, group.Wait())
+
+			for _, merged := range []map[int]string{mergedFirst, mergedSecond} {
+				require.Len(t, merged, len(interfaces)-1, "all interfaces except the failing one should be merged")
+				for i := 1; i < len(interfaces); i++ {
+					assert.Equal(t, interfaces[i], merged[i])
+				}
+			}
+			assert.LessOrEqual(t, maxInFlight.Load(), int64(tt.workers),
+				"concurrency should never exceed the configured worker count")
+			if tt.workers == 1 {
+				assert.Equal(t, int64(1), maxInFlight.Load(), "a single worker should scrape serially")
+			}
+		})
 	}
 }
 

@@ -36,6 +36,7 @@ linters:
             - github.com/aauren/ntopng-exporter
             - github.com/prometheus/client_golang
             - github.com/spf13/viper
+            - golang.org/x/sync
         tests:
           files:
             - "$test"
@@ -45,6 +46,7 @@ linters:
             - github.com/aauren/ntopng-exporter
             - github.com/prometheus/client_golang
             - github.com/spf13/viper
+            - golang.org/x/sync
   exclusions:
     generated: lax
     presets:

@@ -52,10 +52,11 @@ func TestValidateRequestTimeout(t *testing.T) {
 			t.Parallel()
 			config := Config{
 				Ntopng: ntopng{
-					AuthMethod:     "none",
-					ScrapeInterval: tt.scrapeInterval,
-					RequestTimeout: tt.requestTimeout,
-					ScrapeTargets:  []string{AllScrape},
+					AuthMethod:      "none",
+					ScrapeInterval:  tt.scrapeInterval,
+					RequestTimeout:  tt.requestTimeout,
+					ScrapeTargets:   []string{AllScrape},
+					ParallelWorkers: DefaultParallelWorkers,
 				},
 				Host: host{InterfacesToMonitor: []string{"eth0"}},
 				Metric: metric{
