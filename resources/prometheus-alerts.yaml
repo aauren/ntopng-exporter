@@ -142,7 +142,7 @@ groups:
         expr: |
           sum by (instance, target, reason) (
             increase(ntopng_request_errors_total{reason=~"parse|empty"}[15m])
-          ) > 0
+          ) >= 5
         for: 10m
         labels:
           severity: warning
