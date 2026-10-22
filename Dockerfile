@@ -1,4 +1,4 @@
-ARG BUILDTIME_BASE=golang:1.27.1
+ARG BUILDTIME_BASE=golang:1.27.3
 ARG RUNTIME_BASE=gcr.io/distroless/static:latest
 FROM ${BUILDTIME_BASE} AS builder
 
